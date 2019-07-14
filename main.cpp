@@ -4,7 +4,7 @@
 
 FastSerial<UART_3> uart3(PC_10, PC_11, 115200);
 FastSerial<UART_5> uart5(PC_12, PD_2, 115200);
-UARTSerial pc(USBTX, USBRX, 1024000);
+FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 
 const char s[] = "qwertyuioasdfhzxcvnmb,z ljzxcl v.zxcv lau46o5t ualsd7ugou zxjncbvlk 7uzxoibuj lkajklsdg yu8ozpfsugob jzxlcj vlk jzxklcbv7 890zxc7ubvo jzxclbvjkl; zxunc0b987 890zpxc87bvo zhxclv jlzxjvio zx7b890p7u zxo0cbhj lkzxcjgkljzsop89g 7zsf90d78g90p zdujflgbknzjkl;dfhjg9 8pz7sr0gt n8aeorg;zsdfr fgkl;zjxkl;fvj oipzxc7v09- 7890-347850-9b8 a340tajsrklg jklzsjg 7z89fdg790- a0243 t50ja34o5 jaer9-t8 0=afsujvgoipj zkopxjcvk jz90x=c8 ";
 
@@ -16,18 +16,6 @@ Thread rd_thd;
 //	rd_thd.flags_set(0x7FFFFFFF);
 //}
 
-void reader(){
-	char ret[32];
-	while(1){
-//		uart5.read((unsigned char *)ret, sizeof(ret), re_cb, SERIAL_EVENT_RX_ALL, 0xFF);
-//		ThisThread::flags_wait_any(0x7FFFFFFF);
-//		printf(ret);
-//		printf("\n");
-		uart3.read(ret, sizeof(ret));
-		pc.write(ret, sizeof(ret));
-		pc.write(".", 1);
-	}
-}
 
 volatile unsigned int *DWT_CYCCNT  ;
 volatile unsigned int *DWT_CONTROL ;
@@ -49,6 +37,43 @@ void stop_timer(){
     *DWT_CONTROL = *DWT_CONTROL | 0 ; // disable the counter
 }
 
+inline uint32_t get_tick(){
+	return *DWT_CYCCNT;
+}
+
+void pcprintf(const char *fmt, ...){
+	char buf[1024];
+	va_list args;
+	va_start(args, fmt);
+	int len=vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	if (len>0)
+		pc.write(buf, len);
+}
+
+void reader(){
+	char ret[100];
+	while(1){
+//		uart5.read((unsigned char *)ret, sizeof(ret), re_cb, SERIAL_EVENT_RX_ALL, 0xFF);
+//		ThisThread::flags_wait_any(0x7FFFFFFF);
+//		printf(ret);
+//		printf("\n");
+//		ThisThread::sleep_for(2000);
+		uint32_t tick_start = get_tick();
+		int len = uart3.read(ret, sizeof(ret));
+		uint32_t tick = (get_tick() - tick_start);
+		pcprintf("%d us\n", tick/80);
+		if (len == -EAGAIN){
+			pc.write("ERROR\n", 6);
+		}
+		else{
+			pc.write(ret, len);
+			pc.write(".", 1);
+		}
+	}
+}
+
 int main(){
 //	__HAL_FLASH_PREFETCH_BUFFER_ENABLE(); // Enable prefetch to enhance
 //	__HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
@@ -58,9 +83,10 @@ int main(){
 	pc.write("start\r\n", 8);
 	rd_thd.start(reader);
 	us_ticker.start();
+	uart3.set_blocking(false);
 	while(1){
-		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
-//		uart3.write(s, sizeof(s));
+//		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
+		uart3.write(s, sizeof(s));
 		Thread::wait(100);
 		pc.write("\r\n", 2);
 //		Thread::wait(500);

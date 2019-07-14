@@ -155,6 +155,9 @@ inline IRQn_Type dma_irqn(DMA_Channel_TypeDef *dma) {
 #define FASTSERIAL_FLAG_TX 0x02
 #define FASTSERIAL_FLAG_TX_COMPLETE 0x04
 
+#define FASTSERIAL_SIGNAL_RX_AVAILABLE 0x1000
+#define FASTSERIAL_SIGNAL_TX_AVAILABLE 0x2000
+
 extern uint32_t serial_isr_flag;
 
 template<UARTName uart>
@@ -173,7 +176,8 @@ public:
 					rx_start), rx_end(
 					rx_start + MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE), tx_head(
 					tx_start), tx_tail(tx_start), tx_end(
-					tx_start + MBED_CONF_DRIVERS_UART_SERIAL_TXBUF_SIZE) {
+					tx_start + MBED_CONF_DRIVERS_UART_SERIAL_TXBUF_SIZE), tx_thread(
+			NULL), rx_thread(NULL) {
 		//  All taken care by SerialBase constructor
 		MBED_ASSERT(_serial.serial.uart == uart); // Make sure we're dealing with the same thing
 
@@ -191,11 +195,12 @@ public:
 		huart->hdmatx = &tx_dma;
 		tx_dma.Parent = huart;
 
-		if ((uint32_t) tx_dma.Instance < (uint32_t)(DMA2_Channel1)){
-			__HAL_RCC_DMA1_CLK_ENABLE();
-		}
-		else{
-			__HAL_RCC_DMA2_CLK_ENABLE();
+		if ((uint32_t) tx_dma.Instance < (uint32_t) (DMA2_Channel1)) {
+			__HAL_RCC_DMA1_CLK_ENABLE()
+			;
+		} else {
+			__HAL_RCC_DMA2_CLK_ENABLE()
+			;
 		}
 
 		HAL_DMA_Init(&tx_dma);
@@ -246,14 +251,17 @@ public:
 	 *  @return         The number of bytes written, negative error on failure
 	 */
 	virtual ssize_t write(const void *buffer, size_t length) {
-		tx_mtx.lock();
+		// In non-blocking mode, all is taken care in critical section so no need to lock Mutex
+		if (_blocking) {
+			tx_mtx.lock();
+			rtos::ThisThread::flags_clear(FASTSERIAL_SIGNAL_TX_AVAILABLE);
+		}
 		core_util_critical_section_enter();
 
 		if (!_blocking) {
 			size_t capacity = capacity_tx();
 			if (capacity == 0) {
 				core_util_critical_section_exit();
-				tx_mtx.unlock();
 				return -EAGAIN; // Nothing can be written
 			} else {
 				length = (length < capacity) ? length : capacity; // Write partial
@@ -263,15 +271,15 @@ public:
 
 		while (length > 0) {
 			size_t capacity = capacity_tx();
-			size_t max_len = (length < capacity) ? length : capacity; // Maximum transfer
-			for (size_t i = 0; i < max_len; i++) {
+			size_t copied = (length < capacity) ? length : capacity; // Maximum transfer
+			// Push queue
+			for (size_t i = 0; i < copied; i++) {
 				*tx_tail++ = *p++;
 				if (tx_tail == tx_end)
 					tx_tail = tx_start;
 			}
-			length -= max_len;
 
-			if (!(HAL_UART_GetState(huart) & 0x01)) {
+			if (huart->gState == HAL_UART_STATE_READY) {
 				// No ongoing transmission
 				size_t tx_len;
 				if (tx_tail >= tx_head) {
@@ -284,20 +292,29 @@ public:
 				HAL_UART_Transmit_DMA(huart, (uint8_t*) tx_head, tx_len);
 			}
 
+			length -= copied;
+
 			if (_blocking) {
 				// Wait for transmission to finish
 				// Due to the mutex, no other data will be added further.
 				// So just wait for the current transmission to finish
 				while (!tx_empty()) {
+					// Wait for wake up from IRQ
+					tx_thread = rtos::ThisThread::get_id();
+					// IRQ comes immediately after exiting critical section,
 					core_util_critical_section_exit();
-					rtos::ThisThread::yield(); // TODO
+					// The flag might already be set at this point
+					rtos::ThisThread::flags_wait_all(
+					FASTSERIAL_SIGNAL_TX_AVAILABLE, true);
+					// Flag will be automatically cleared by now
 					core_util_critical_section_enter();
 				}
 			}
 
 		}
 		core_util_critical_section_exit();
-		tx_mtx.unlock();
+		if (_blocking)
+			tx_mtx.unlock();
 
 		return p - (unsigned char*) buffer;
 	}
@@ -315,56 +332,66 @@ public:
 	 *  @return         The number of bytes read, 0 at end of file, negative error on failure
 	 */
 	virtual ssize_t read(void *buffer, size_t length) {
-		rx_mtx.lock();
+		// In non-blocking mode, all is taken care in critical section so no need to lock Mutex
+		if (_blocking) {
+			rx_mtx.lock();
+			rtos::ThisThread::flags_clear(FASTSERIAL_SIGNAL_RX_AVAILABLE);
+		}
 		core_util_critical_section_enter();
 		unsigned char *p = (unsigned char *) buffer;
 		while (length > 0) {
 			size_t available = available_rx();
 			// First read all available data up to length
 			size_t copied = available < length ? available : length;
+			// Pop the queue
 			for (unsigned int i = 0; i < copied; i++) {
 				*p++ = *rx_head++;
 				if (rx_head == rx_end)
 					rx_head = rx_start;
 			}
+			// Init next receive if not so
+			if (huart->RxState == HAL_UART_STATE_READY) {
+				// No ongoing reception
+				size_t rx_len;
+				if (rx_tail < rx_head) {
+					rx_len = rx_head - rx_tail - 1;
+				} else {
+					if (rx_head != rx_start)
+						rx_len = rx_end - rx_tail;
+					else
+						rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
+				}
+
+				HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len); // Start receive
+			}
+			// Break if done
 			length -= copied;
 			if (length == 0)
 				break;
-
-			// Still not done yet. Wait or not depend on _blocking
+			// Wait or not depend on _blocking
 			if (!_blocking) {
-				core_util_critical_section_exit();
-				rx_mtx.unlock();
-				return copied == 0 ? -EAGAIN : copied;
+				break;
 			} else {
 				// Wait for data to be available for copy
-				// Init receive if not so
-				if (!(HAL_UART_GetState(huart) & 0x02)) {
-					// No ongoing reception
-					size_t rx_len;
-					if (rx_tail < rx_head) {
-						rx_len = rx_head - rx_tail - 1;
-					} else {
-						if (rx_head != rx_start)
-							rx_len = rx_end - rx_tail;
-						else
-							rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
-					}
-
-					HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len); // Start receive
-				}
 				while (rx_empty()) {
+					rx_thread = rtos::ThisThread::get_id();
+					// IRQ comes immediately after exiting critical section,
 					core_util_critical_section_exit();
-					rtos::ThisThread::sleep_for(1); // TODO Improve
+					// The flag might already be set at this point
+					rtos::ThisThread::flags_wait_all(
+					FASTSERIAL_SIGNAL_RX_AVAILABLE, true);
+					// Flag will be automatically cleared by now
 					core_util_critical_section_enter();
 				}
 			}
 		}
 
 		core_util_critical_section_exit();
-		rx_mtx.unlock();
+		if (_blocking)
+			rx_mtx.unlock();
 
-		return p - (unsigned char*) buffer;
+		size_t len = (p - (unsigned char*) buffer);
+		return len > 0 ? len : -EAGAIN;
 	}
 
 	/** Close a file
@@ -528,6 +555,9 @@ private:
 	DMA_HandleTypeDef tx_dma;
 	DMA_HandleTypeDef rx_dma;
 
+	osThreadId_t tx_thread;
+	osThreadId_t rx_thread;
+
 	static UART_HandleTypeDef *huart; // Instantiated in FastSerial.cpp for all possible template values
 	static FastSerial *instance;
 
@@ -543,8 +573,7 @@ private:
 				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_RXNE) != RESET) {
 			// Received something
 			serial_isr_flag = FASTSERIAL_FLAG_RX;
-		}
-		else if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET
+		} else if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET
 				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TC) != RESET) {
 			// TX complete
 			serial_isr_flag = FASTSERIAL_FLAG_TX_COMPLETE;
@@ -568,11 +597,15 @@ private:
 					HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len);
 				}
 			}
-		}
-		else if (serial_isr_flag == FASTSERIAL_FLAG_RX) {// Received something
+		} else if (serial_isr_flag == FASTSERIAL_FLAG_RX) { // Received something
 			rx_tail++; // Push the queue
 			if (rx_tail == rx_end)
 				rx_tail = rx_start;
+			// Signal the waiting thread
+			if (rx_thread) {
+				osThreadFlagsSet(rx_thread, FASTSERIAL_SIGNAL_RX_AVAILABLE);
+				rx_thread = NULL; // Can be only set once
+			}
 			if (huart->RxState == HAL_UART_STATE_READY) {
 				size_t rx_len = 0;
 				if (rx_tail < rx_head) {
@@ -589,8 +622,7 @@ private:
 				}
 			}
 			return;
-		}
-		else if (serial_isr_flag == FASTSERIAL_FLAG_TX_COMPLETE) { // TX complete, prepare next transmission
+		} else if (serial_isr_flag == FASTSERIAL_FLAG_TX_COMPLETE) { // TX complete, prepare next transmission
 			size_t tx_len = 0;
 			// Setup next transfer
 			tx_head += huart->TxXferSize;
@@ -604,6 +636,11 @@ private:
 			if (tx_len > 0) {
 				// Start next transmission
 				HAL_UART_Transmit_DMA(huart, (uint8_t *) tx_head, tx_len);
+			}
+			// Signal the tx_thread for completion
+			if (tx_thread) {
+				osThreadFlagsSet(tx_thread, FASTSERIAL_SIGNAL_TX_AVAILABLE);
+				tx_thread = NULL; // Can be only set once
 			}
 		}
 	}
