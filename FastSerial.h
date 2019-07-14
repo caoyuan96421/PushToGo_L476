@@ -537,22 +537,17 @@ private:
 
 	void isr() {
 		uint32_t serial_isr_flag = 0;
+		// Deal with only one flag per call
 		// Pre-analyze some of the flags
-//		if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TXE) != RESET
-//				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TXE) != RESET
-//				&& huart->TxXferCount > 0) {
-//			// Transmitted something
-//			serial_isr_flag |= FASTSERIAL_FLAG_TX;
-//		}
-		if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET
-				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TC) != RESET) {
-			// TX complete
-			serial_isr_flag |= FASTSERIAL_FLAG_TX_COMPLETE;
-		}
 		if (__HAL_UART_GET_FLAG(huart, UART_FLAG_RXNE) != RESET
 				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_RXNE) != RESET) {
 			// Received something
-			serial_isr_flag |= FASTSERIAL_FLAG_RX;
+			serial_isr_flag = FASTSERIAL_FLAG_RX;
+		}
+		else if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET
+				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TC) != RESET) {
+			// TX complete
+			serial_isr_flag = FASTSERIAL_FLAG_TX_COMPLETE;
 		}
 		// Hand over to STM HAL
 		HAL_UART_IRQHandler(huart);
@@ -574,32 +569,7 @@ private:
 				}
 			}
 		}
-		// Transmitted something, pop the queue
-//		if (serial_isr_flag & FASTSERIAL_FLAG_TX) {
-//			tx_head++;
-//			if (tx_head == tx_end)
-//				tx_head = tx_start;
-//		}
-		// TX complete, prepare next transmission
-		if (serial_isr_flag & FASTSERIAL_FLAG_TX_COMPLETE) {
-			tx_head += huart->TxXferSize; // Pop all data that has been transfered
-			if (tx_head >= tx_end)
-				tx_head -= MBED_CONF_DRIVERS_UART_SERIAL_TXBUF_SIZE;
-			size_t tx_len = 0;
-			// Setup next transfer
-			if (tx_tail >= tx_head) {
-				tx_len = tx_tail - tx_head;
-			} else {
-				tx_len = tx_end - tx_head;
-			}
-			if (tx_len > 0) {
-				// Start next transmission
-//				HAL_UART_Transmit_IT(huart, (uint8_t *) tx_head, tx_len);
-				HAL_UART_Transmit_DMA(huart, (uint8_t *) tx_head, tx_len);
-			}
-		}
-		// Received something
-		if (serial_isr_flag & FASTSERIAL_FLAG_RX) {
+		else if (serial_isr_flag == FASTSERIAL_FLAG_RX) {// Received something
 			rx_tail++; // Push the queue
 			if (rx_tail == rx_end)
 				rx_tail = rx_start;
@@ -617,6 +587,20 @@ private:
 					// Start next reception
 					HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len);
 				}
+			}
+			return;
+		}
+		else if (serial_isr_flag == FASTSERIAL_FLAG_TX_COMPLETE) { // TX complete, prepare next transmission
+			size_t tx_len = 0;
+			// Setup next transfer
+			if (tx_tail >= tx_head) {
+				tx_len = tx_tail - tx_head;
+			} else {
+				tx_len = tx_end - tx_head;
+			}
+			if (tx_len > 0) {
+				// Start next transmission
+				HAL_UART_Transmit_DMA(huart, (uint8_t *) tx_head, tx_len);
 			}
 		}
 	}
