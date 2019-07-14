@@ -58,11 +58,11 @@ int main(){
 	pc.write("start\r\n", 8);
 	rd_thd.start(reader);
 	us_ticker.start();
-	uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 	while(1){
+		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
-		Thread::wait(500);
+		Thread::wait(100);
 		pc.write("\r\n", 2);
-		Thread::wait(500);
+//		Thread::wait(500);
 	}
 }

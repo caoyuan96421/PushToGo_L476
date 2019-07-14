@@ -593,6 +593,9 @@ private:
 		else if (serial_isr_flag == FASTSERIAL_FLAG_TX_COMPLETE) { // TX complete, prepare next transmission
 			size_t tx_len = 0;
 			// Setup next transfer
+			tx_head += huart->TxXferSize;
+			if (tx_head >= tx_end)
+				tx_head -= MBED_CONF_DRIVERS_UART_SERIAL_TXBUF_SIZE;
 			if (tx_tail >= tx_head) {
 				tx_len = tx_tail - tx_head;
 			} else {
