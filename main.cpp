@@ -76,6 +76,75 @@ void pcprintf(const char *fmt, ...) {
 //	}
 //}
 
+// Override the default fatal error handlers
+extern "C" void mbed_die(void) {
+#if !defined (NRF51_H) && !defined(TARGET_EFM32)
+	core_util_critical_section_enter();
+#endif
+	gpio_t led_err;
+	gpio_init_out(&led_err, LED3);
+
+	while (1) {
+		for (int i = 0; i < 4; ++i) {
+			gpio_write(&led_err, 1);
+			wait_us(150000);
+			gpio_write(&led_err, 0);
+			wait_us(150000);
+		}
+
+		for (int i = 0; i < 4; ++i) {
+			gpio_write(&led_err, 1);
+			wait_us(400000);
+			gpio_write(&led_err, 0);
+			wait_us(400000);
+		}
+	}
+}
+
+extern "C" void error(const char *format, ...) {
+	static char buffer[257];
+	core_util_critical_section_enter();
+#ifndef NDEBUG
+	va_list arg;
+	va_start(arg, format);
+	int size = vsnprintf(buffer, sizeof(buffer) - 1, format, arg);
+	if (size >= (int) sizeof(buffer)) {
+		// Properly terminate the string
+		buffer[sizeof(buffer) - 1] = '\0';
+	}
+	va_end(arg);
+
+	// Print multi-row message
+	int row = 0;
+	char *p = buffer;
+	while (size > 0) {
+		lcd.setPosition(row, 0);
+		lcd.write(p, size < 16 ? size : 16);
+		p += 16;
+		size -= 16;
+		row++;
+		if (row == 2 && size > 0) {
+			// Scroll
+			wait_us(1000000);
+			lcd.clear();
+			lcd.setPosition(0, 0);
+			lcd.write(p - 16, 16);
+			row = 1;
+		}
+	}
+#endif
+
+	mbed_die();
+
+	core_util_critical_section_exit(); // Will not reach here
+}
+
+extern "C" MBED_NORETURN mbed_error_status_t mbed_error(
+		mbed_error_status_t error_status, const char *error_msg,
+		unsigned int error_value, const char *filename, int line_number) {
+	error("Error: 0x%x, %s", error_status, error_msg);
+}
+
 int main() {
 //	__HAL_FLASH_PREFETCH_BUFFER_ENABLE(); // Enable prefetch to enhance
 //	__HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
@@ -92,9 +161,13 @@ int main() {
 //		uart3.write(s, sizeof(s));
 		ThisThread::sleep_for(100);
 		time_t t = time(NULL);
-		lcd.setPosition(0,0);
+		lcd.setPosition(0, 0);
 		lcd.printf("%lld", t);
 		pcprintf("%lld\r\n", t);
+
+		if (rand() % 5 == 0) {
+			// Generate a fault
+		}
 //		Thread::wait(500);
 	}
 }

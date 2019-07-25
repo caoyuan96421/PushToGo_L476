@@ -37,11 +37,11 @@ void LCD1602::clear() {
 	command(0x01);
 }
 
-void LCD1602::print(const char *s) {
-	for (const char *p = s; *p; p++) {
+void LCD1602::write(const char *buf, int len) {
+	for (int i = 0; i < len; i++) {
 		rw = 0;
 		rs = 1;
-		send_byte(*p);
+		send_byte(buf[i]);
 		busy_wait();
 	}
 }

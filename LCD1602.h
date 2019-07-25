@@ -20,7 +20,7 @@ public:
 	virtual ~LCD1602();
 
 	void clear();
-	void print(const char *s);
+	void write(const char *buf, int len);
 	void printf(const char *fmt, ...);
 	void setCursor(bool on);
 	void setDisplay(bool on);
