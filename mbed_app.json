@@ -5,6 +5,10 @@
                 "target.clock_source": "USE_PLL_HSE_XTAL", 
                 "platform.stdio-baud-rate": 1024000,
                 "platform.default-serial-baud-rate": 1024000
+            },
+            "*": {
+                "nvstore.max_keys" : 32
             }
-        }
+        },
+    "macros": ["DEVICE_SPI_COUNT=3"]
 }

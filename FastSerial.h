@@ -118,33 +118,33 @@ inline DMA_Channel_TypeDef *serial_get_dma_tx(UARTName uart_name,
 inline IRQn_Type dma_irqn(DMA_Channel_TypeDef *dma) {
 	switch ((uint32_t) dma) {
 
-	case (const uint32_t) DMA1_Channel1_BASE:
+	case (uint32_t) DMA1_Channel1_BASE:
 		return DMA1_Channel1_IRQn;
-	case (const uint32_t) DMA1_Channel2_BASE:
+	case (uint32_t) DMA1_Channel2_BASE:
 		return DMA1_Channel2_IRQn;
-	case (const uint32_t) DMA1_Channel3_BASE:
+	case (uint32_t) DMA1_Channel3_BASE:
 		return DMA1_Channel3_IRQn;
-	case (const uint32_t) DMA1_Channel4_BASE:
+	case (uint32_t) DMA1_Channel4_BASE:
 		return DMA1_Channel4_IRQn;
-	case (const uint32_t) DMA1_Channel5_BASE:
+	case (uint32_t) DMA1_Channel5_BASE:
 		return DMA1_Channel5_IRQn;
-	case (const uint32_t) DMA1_Channel6_BASE:
+	case (uint32_t) DMA1_Channel6_BASE:
 		return DMA1_Channel6_IRQn;
-	case (const uint32_t) DMA1_Channel7_BASE:
+	case (uint32_t) DMA1_Channel7_BASE:
 		return DMA1_Channel7_IRQn;
-	case (const uint32_t) DMA2_Channel1_BASE:
+	case (uint32_t) DMA2_Channel1_BASE:
 		return DMA2_Channel1_IRQn;
-	case (const uint32_t) DMA2_Channel2_BASE:
+	case (uint32_t) DMA2_Channel2_BASE:
 		return DMA2_Channel2_IRQn;
-	case (const uint32_t) DMA2_Channel3_BASE:
+	case (uint32_t) DMA2_Channel3_BASE:
 		return DMA2_Channel3_IRQn;
-	case (const uint32_t) DMA2_Channel4_BASE:
+	case (uint32_t) DMA2_Channel4_BASE:
 		return DMA2_Channel4_IRQn;
-	case (const uint32_t) DMA2_Channel5_BASE:
+	case (uint32_t) DMA2_Channel5_BASE:
 		return DMA2_Channel5_IRQn;
-	case (const uint32_t) DMA2_Channel6_BASE:
+	case (uint32_t) DMA2_Channel6_BASE:
 		return DMA2_Channel6_IRQn;
-	case (const uint32_t) DMA2_Channel7_BASE:
+	case (uint32_t) DMA2_Channel7_BASE:
 		return DMA2_Channel7_IRQn;
 	default:
 		return (IRQn_Type) 0;

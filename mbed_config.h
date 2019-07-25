@@ -52,6 +52,16 @@
 #define MBED_CONF_PLATFORM_STDIO_CONVERT_TTY_NEWLINES        0                                       // set by library:platform
 #define MBED_CONF_PLATFORM_STDIO_FLUSH_AT_EXIT               1                                       // set by library:platform
 #define MBED_CONF_PLATFORM_USE_MPU                           1                                       // set by library:platform
+#define MBED_CONF_PUSHTOGO_ACCELERATION_STEP_TIME            5                                       // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_CORRECTION_SPEED_SIDEREAL         32.0                                    // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_CORRECTION_TOLERANCE              0.03                                    // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_DEFAULT_GUIDE_SPEED_SIDEREAL      0.5                                     // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_DEFAULT_SLEW_SPEED                4.0                                     // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_DEFAULT_TRACK_SPEED_SIDEREAL      1.0                                     // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_MAX_CORRECTION_ANGLE              5                                       // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_MAX_GUIDE_TIME                    5000                                    // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_MIN_CORRECTION_TIME               5                                       // set by library:pushtogo
+#define MBED_CONF_PUSHTOGO_MIN_SLEW_ANGLE                    0.3                                     // set by library:pushtogo
 #define MBED_CONF_RTOS_IDLE_THREAD_STACK_SIZE                512                                     // set by library:rtos
 #define MBED_CONF_RTOS_IDLE_THREAD_STACK_SIZE_DEBUG_EXTRA    128                                     // set by library:rtos[STM]
 #define MBED_CONF_RTOS_IDLE_THREAD_STACK_SIZE_TICKLESS_EXTRA 256                                     // set by library:rtos
@@ -76,8 +86,9 @@
 #define MBED_LFS_PROG_SIZE                                   64                                      // set by library:littlefs
 #define MBED_LFS_READ_SIZE                                   64                                      // set by library:littlefs
 #define NVSTORE_ENABLED                                      1                                       // set by library:nvstore
-#define NVSTORE_MAX_KEYS                                     16                                      // set by library:nvstore
+#define NVSTORE_MAX_KEYS                                     32                                      // set by application[*]
 // Macros
+#define DEVICE_SPI_COUNT                                     3                                       // defined by application
 #define MBEDTLS_PSA_HAS_ITS_IO                                                                       // defined by library:mbed-crypto
 #define _RTE_                                                                                        // defined by library:rtos
 
