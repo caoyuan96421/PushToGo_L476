@@ -181,8 +181,8 @@ void LCD1602::busy_wait() {
 void LCD1602::init() {
 	rs = 0;
 	rw = 0;
-	// Init delay
-	wait_ms(15);
+	// Powerup delay
+	wait_ms(100);
 	// Init four wire
 	if (fw) {
 		send_high_nibble(0x30);

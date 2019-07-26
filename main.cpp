@@ -3,11 +3,13 @@
 #include "FastSerial.h"
 #include "Board.h"
 #include "LCD1602.h"
+#include "LED.h"
 //FastSerial<UART_3> uart3(PC_10, PC_11, 115200);
 //FastSerial<UART_5> uart5(PC_12, PD_2, 115200);
 FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 PinName lcdpins[] = { NC, NC, NC, NC, LCD_D4, LCD_D5, LCD_D6, LCD_D7 };
 LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
+LED led(LED1);
 
 //const char s[] = "qwertyuioasdfhzxcvnmb,z ljzxcl v.zxcv lau46o5t ualsd7ugou zxjncbvlk 7uzxoibuj lkajklsdg yu8ozpfsugob jzxlcj vlk jzxklcbv7 890zxc7ubvo jzxclbvjkl; zxunc0b987 890zpxc87bvo zhxclv jlzxjvio zx7b890p7u zxo0cbhj lkzxcjgkljzsop89g 7zsf90d78g90p zdujflgbknzjkl;dfhjg9 8pz7sr0gt n8aeorg;zsdfr fgkl;zjxkl;fvj oipzxc7v09- 7890-347850-9b8 a340tajsrklg jklzsjg 7z89fdg790- a0243 t50ja34o5 jaer9-t8 0=afsujvgoipj zkopxjcvk jz90x=c8 ";
 
@@ -146,9 +148,6 @@ extern "C" MBED_NORETURN mbed_error_status_t mbed_error(
 }
 
 int main() {
-//	__HAL_FLASH_PREFETCH_BUFFER_ENABLE(); // Enable prefetch to enhance
-//	__HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
-//	__HAL_FLASH_DATA_CACHE_ENABLE();
 	reset_timer();
 	start_timer();
 	pc.write("start\r\n", 8);
@@ -159,7 +158,7 @@ int main() {
 	while (1) {
 //		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
-		ThisThread::sleep_for(100);
+		ThisThread::sleep_for(1000);
 		time_t t = time(NULL);
 		lcd.setPosition(0, 0);
 		lcd.printf("%lld", t);
@@ -167,7 +166,9 @@ int main() {
 
 		if (rand() % 5 == 0) {
 			// Generate a fault
+//			lcd.setBrightness((rand() % 10) / 10.0f);
 		}
+		led.test();
 //		Thread::wait(500);
 	}
 }
