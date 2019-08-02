@@ -21,7 +21,7 @@ LCD1602::LCD1602(PinName rs, PinName rw, PinName en, PinName d[],
 	}
 	if (brightness != NC) {
 		br = new PwmOut(brightness);
-		br->period_us(10);
+		br->period_us(64);
 		*br = 1.0;
 	}
 	init();

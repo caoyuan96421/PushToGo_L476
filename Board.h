@@ -22,6 +22,28 @@
 
 #define BOARD_VERSION 1.0
 
+#if defined(BOARD_USE_MOTOR) && BOARD_USE_MOTOR
+
+// Motor connections, common
+#define MOTOR_SCK		PA_5
+#define MOTOR_MOSI		PA_7
+#define MOTOR_MISO		PA_6
+
+// Motor1 (RA)
+#define MOTOR1_CS		PB_6
+#define MOTOR1_STEP		PB_2
+#define MOTOR1_DIR		PC_7
+#define MOTOR1_IREF		PB_7
+#define MOTOR1_DIAG		PD_2
+
+#define MOTOR2_CS		PA_9
+#define MOTOR2_STEP		PB_0
+#define MOTOR2_DIR		PA_8
+#define MOTOR2_IREF		PB_6
+#define MOTOR2_DIAG		PA_15
+
+#endif
+
 // LCD related definitions
 #if defined(BOARD_USE_LCD) && BOARD_USE_LCD
 #define LCD_USE_4W	1

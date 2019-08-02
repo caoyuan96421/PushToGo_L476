@@ -4,7 +4,8 @@
             "NUCLEO_L476RG": {
                 "target.clock_source": "USE_PLL_HSE_XTAL", 
                 "platform.stdio-baud-rate": 1024000,
-                "platform.default-serial-baud-rate": 1024000
+                "platform.default-serial-baud-rate": 1024000, 
+                "target.lpticker_lptim": 0
             },
             "*": {
                 "nvstore.max_keys" : 32

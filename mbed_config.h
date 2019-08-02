@@ -73,7 +73,7 @@
 #define MBED_CONF_TARGET_CONSOLE_UART                        1                                       // set by target:Target
 #define MBED_CONF_TARGET_DEEP_SLEEP_LATENCY                  3                                       // set by target:FAMILY_STM32
 #define MBED_CONF_TARGET_INIT_US_TICKER_AT_BOOT              1                                       // set by target:FAMILY_STM32
-#define MBED_CONF_TARGET_LPTICKER_LPTIM                      1                                       // set by target:NUCLEO_L476RG
+#define MBED_CONF_TARGET_LPTICKER_LPTIM                      0                                       // set by application[NUCLEO_L476RG]
 #define MBED_CONF_TARGET_LPTICKER_LPTIM_CLOCK                1                                       // set by target:FAMILY_STM32
 #define MBED_CONF_TARGET_LPUART_CLOCK_SOURCE                 USE_LPUART_CLK_LSE|USE_LPUART_CLK_PCLK1 // set by target:FAMILY_STM32
 #define MBED_CONF_TARGET_LSE_AVAILABLE                       1                                       // set by target:FAMILY_STM32

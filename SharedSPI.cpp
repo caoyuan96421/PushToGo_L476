@@ -9,8 +9,10 @@
 
 using namespace mbed;
 
-SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk) :
-		SPI(mosi, miso, sclk, NC), polarity(false), num_ifcs(0) {
+SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq) :
+		spi(mosi, miso, sclk, NC), polarity(false), num_ifcs(0) {
+	spi.format(bit, mode);
+	spi.frequency(freq);
 }
 
 SharedSPI::~SharedSPI() {
@@ -23,23 +25,23 @@ SharedSPI::~SharedSPI() {
 int SharedSPI::SPI_Interface::write(int value) {
 	parent->acquire();
 	parent->assertCS(cs);
-	int ret = parent->write(value);
+	int ret = parent->spi.write(value);
 	parent->deassertCS(cs);
 	parent->release();
 	return ret;
 }
 
-int SharedSPI::SPI_Interface::write(const char* tx_buffer, int tx_length,
-		char* rx_buffer, int rx_length) {
+int SharedSPI::SPI_Interface::write(const char *tx_buffer, int tx_length,
+		char *rx_buffer, int rx_length) {
 	parent->acquire();
 	parent->assertCS(cs);
-	int ret = parent->write(tx_buffer, tx_length, rx_buffer, rx_length);
+	int ret = parent->spi.write(tx_buffer, tx_length, rx_buffer, rx_length);
 	parent->deassertCS(cs);
 	parent->release();
 	return ret;
 }
 
-SharedSPI::SPI_Interface::SPI_Interface(SharedSPI* p, PinName c) :
+SharedSPI::SPI_Interface::SPI_Interface(SharedSPI *p, PinName c) :
 		SPI(NC, NC, NC), parent(p), cs(c) {
 	// The parent SPI will be still be initiated to SPIName of NC, but will not be used
 	// The "NC" SPI object will be shared among interfaces
@@ -61,4 +63,16 @@ inline void SharedSPI::assertCS(DigitalOut &cs) {
 
 inline void SharedSPI::deassertCS(DigitalOut &cs) {
 	cs = polarity ? 0 : 1;
+}
+
+// Only allow the first interface to set format and frequency
+
+void mbed::SharedSPI::SPI_Interface::format(int bits, int mode) {
+	if (this == parent->ifcs[0])
+		parent->spi.format(bits, mode);
+}
+
+void mbed::SharedSPI::SPI_Interface::frequency(int hz) {
+	if (this == parent->ifcs[0])
+		parent->spi.frequency(hz);
 }
