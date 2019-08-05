@@ -36,9 +36,9 @@
 #define MOTOR1_IREF		PB_7
 #define MOTOR1_DIAG		PD_2
 
-#define MOTOR2_CS		PA_9
+#define MOTOR2_CS		PA_8
 #define MOTOR2_STEP		PB_0
-#define MOTOR2_DIR		PA_8
+#define MOTOR2_DIR		NC
 #define MOTOR2_IREF		PB_6
 #define MOTOR2_DIAG		PA_15
 
@@ -92,5 +92,10 @@
 
 #endif
 
+// Serial definition
+#if defined(BOARD_USE_SERIAL) && BOARD_USE_SERIAL
+#define HC_TX	PC_10
+#define HC_RX	PC_11
+#endif
 
 #endif /* BOARD_H_ */

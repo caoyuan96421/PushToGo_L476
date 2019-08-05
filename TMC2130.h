@@ -14,7 +14,7 @@
 
 class TMC2130: public StepperMotor {
 public:
-	TMC2130(SPI &spi, PinName step, PinName dir, PinName err=NC, PinName iref=NC);
+	TMC2130(SPI &spi, PinName step, PinName dir, PinName err=NC, PinName iref=NC, bool invert=false);
 	virtual ~TMC2130();
 
 	/**
@@ -84,7 +84,7 @@ public:
 	void setStealthChop(bool enable);
 
 	void recoverFromError(){
-		if (status = ERROR){
+		if (status == ERROR){
 			status = IDLE;
 			powerOn();
 		}

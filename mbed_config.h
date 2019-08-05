@@ -78,7 +78,7 @@
 #define MBED_CONF_TARGET_LPUART_CLOCK_SOURCE                 USE_LPUART_CLK_LSE|USE_LPUART_CLK_PCLK1 // set by target:FAMILY_STM32
 #define MBED_CONF_TARGET_LSE_AVAILABLE                       1                                       // set by target:FAMILY_STM32
 #define MBED_CONF_TARGET_MPU_ROM_END                         0x0fffffff                              // set by target:Target
-#define MBED_CONF_TARGET_TICKLESS_FROM_US_TICKER             0                                       // set by target:Target
+#define MBED_CONF_TARGET_TICKLESS_FROM_US_TICKER             1                                       // set by application[NUCLEO_L476RG]
 #define MBED_LFS_BLOCK_SIZE                                  512                                     // set by library:littlefs
 #define MBED_LFS_ENABLE_INFO                                 0                                       // set by library:littlefs
 #define MBED_LFS_INTRINSICS                                  1                                       // set by library:littlefs
@@ -90,6 +90,7 @@
 // Macros
 #define DEVICE_SPI_COUNT                                     3                                       // defined by application
 #define MBEDTLS_PSA_HAS_ITS_IO                                                                       // defined by library:mbed-crypto
+#define OS_ISR_FIFO_QUEUE                                    64                                      // defined by application
 #define _RTE_                                                                                        // defined by library:rtos
 
 #endif

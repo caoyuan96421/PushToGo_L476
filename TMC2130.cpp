@@ -60,23 +60,25 @@
 // stallGuard sensitivity, lower value is more sensitive
 #define SG_THD	0
 
-TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref) :
-		spi(spi), step(step), dir(dir), err(err), iref(NULL), status(IDLE), inc(
-				1), stepCount(0), eq_thread(osPriorityAboveNormal), cb(NULL) {
+TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref,
+		bool invert) :
+		StepperMotor(invert), spi(spi), step(step), dir(dir), err(err), iref(
+		NULL), status(IDLE), inc(1), stepCount(0), eq_thread(
+				osPriorityAboveNormal), cb(NULL) {
 	useDir = (dir != NC);
 	useErr = (err != NC);
 	useIref = (iref != NC);
 //	spi.format(8, 3); // 8-bit, Mode 3
 //	spi.frequency(1000000); // 1MHz clock
 
-	// Stop the steps
+// Stop the steps
 	this->step.stop();
 
 	if (useDir)
 		this->dir = 0;
 
 	// Register values
-	CHOPCONF_VALUE = 0x200101C3 | (VSENSE << 17) | (INTERP << 28); //DOUBLE edge, TOFF=3, HSTRT=4, HEND=3, TBL=2, CHM=0 (spreadCycle)
+	CHOPCONF_VALUE = 0x200101C3 | (VSENSE << 17) | (INTERP << 28) | (1 << 30); //DOUBLE edge, TOFF=3, HSTRT=4, HEND=3, TBL=2, CHM=0 (spreadCycle)
 	GCONF_VALUE = 0x00000000; // disable stealthChop/
 	PWMCONF_VALUE = 0x00050480 | (FREEWHEEL << 20); // PWM_CONF: Default value + Freewheel: LS brake
 	IHOLD_IRUN_VALUE = ((FREEWHEEL ? 0 : uint8_t(31 * IHOLD_PERCENT)) << 0)
@@ -93,7 +95,7 @@ TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref)
 
 	// Enable error outputs?
 	if (useErr) {
-		GCONF_VALUE |= (1 << 5) | (1 << 6) | (1 << 7);
+		GCONF_VALUE |= (1 << 6);
 		this->err.fall(callback(this, &TMC2130::irq));
 	}
 
@@ -102,7 +104,8 @@ TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref)
 	hw_writereg(TMC2130_PWMCONF, PWMCONF_VALUE);
 	hw_writereg(TMC2130_CHOPCONF, CHOPCONF_VALUE);
 	hw_writereg(TMC2130_IHOLD_IRUN, IHOLD_IRUN_VALUE);
-	hw_writereg(TMC2130_COOLCONF, 0x01000000 | ((uint32_t)(SG_THD & 0x7F) << 16)); // Enable stallGuard filter
+	hw_writereg(TMC2130_COOLCONF,
+			0x01000000 | ((uint32_t) (SG_THD & 0x7F) << 16)); // Enable stallGuard filter
 	hw_writereg(TMC2130_TPWMTHRS, SWITCH_THD);
 	hw_writereg(TMC2130_TCOOLTHRS, SG_SPEED);
 	hw_writereg(TMC2130_TPOWERDOWN, 0x00000004); // 4 cycle before standstill shutdown
@@ -273,10 +276,10 @@ void TMC2130::setStealthChop(bool enable) {
 	}
 	if (enable) {
 		GCONF_VALUE |= 0x00000004; // enable stealthChop/
-		GCONF_VALUE &= ~0x0000080; // disable stall detection
+//		GCONF_VALUE &= ~0x0000080; // disable stall detection
 	} else {
 		GCONF_VALUE &= ~0x00000004; // disable stealthChop/
-		GCONF_VALUE |= 0x0000080; // enable stall detection
+//		GCONF_VALUE |= 0x0000080; // enable stall detection
 	}
 	hw_writereg(TMC2130_GCONF, GCONF_VALUE);
 }
@@ -301,36 +304,36 @@ void TMC2130::err_cb() {
 		error_stop();
 		fprintf(stderr, "TMC2130: Over temperature");
 	}
-	if ((drv_stat & (1 << 24)) && status == STEPPING) {
-		uint32_t tstep = hw_readreg(TMC2130_TSTEP);
-		if (tstep <= SG_SPEED - 20) { // Ignore the range just above SG_SPEED
-			status = ERROR;
-			error_stop();
-			fprintf(stderr, "TMC2130: Motor stalled");
-		}
-	}
-	if ((drv_stat & ((1 << 29) | (1 << 30))) && status == STEPPING) {
-		// Open load flag, need to confirm
-		uint32_t tstep = hw_readreg(TMC2130_TSTEP);
-		if (tstep >= SWITCH_THD) {
-			// stealthChop mode, check PWMSCALE
-			uint32_t pwmscale = hw_readreg(TMC2130_PWM_SCALE);
-			printf("PWMSCALE: 0x%08x\r\n", pwmscale);
-			static int stall_count = 0;
-			if (pwmscale == 255) {
-				// Might be stalled
-				if (++stall_count <= 3) {
-					return; //
-				}
-			} else {
-				stall_count = 0; // Clear it if not stalled
-				return;
-			}
-		}
-		// Generate error otherwise
-		error_stop();
-		fprintf(stderr, "TMC2130: Phase open circuit");
-	}
+//	if ((drv_stat & (1 << 24)) && status == STEPPING) {
+//		uint32_t tstep = hw_readreg(TMC2130_TSTEP);
+//		if (tstep <= SG_SPEED - 20) { // Ignore the range just above SG_SPEED
+//			status = ERROR;
+//			error_stop();
+//			fprintf(stderr, "TMC2130: Motor stalled");
+//		}
+//	}
+//	if ((drv_stat & ((1 << 29) | (1 << 30))) && status == STEPPING) {
+//		// Open load flag, need to confirm
+//		uint32_t tstep = hw_readreg(TMC2130_TSTEP);
+//		if (tstep >= SWITCH_THD) {
+//			// stealthChop mode, check PWMSCALE
+//			uint32_t pwmscale = hw_readreg(TMC2130_PWM_SCALE);
+//			printf("PWMSCALE: 0x%08x\r\n", pwmscale);
+//			static int stall_count = 0;
+//			if (pwmscale == 255) {
+//				// Might be stalled
+//				if (++stall_count <= 3) {
+//					return; //
+//				}
+//			} else {
+//				stall_count = 0; // Clear it if not stalled
+//				return;
+//			}
+//		}
+//		// Generate error otherwise
+//		error_stop();
+//		fprintf(stderr, "TMC2130: Phase open circuit");
+//	}
 }
 
 void TMC2130::debug() {

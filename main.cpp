@@ -8,6 +8,7 @@
 #include "SharedSPI.h"
 #include "Axis.h"
 #include "TelescopeConfiguration.h"
+#include "telescope_hardware.h"
 
 //FastSerial<UART_3> uart3(PC_10, PC_11, 115200);
 //FastSerial<UART_5> uart5(PC_12, PD_2, 115200);
@@ -15,33 +16,33 @@ FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 PinName lcdpins[] = { NC, NC, NC, NC, LCD_D4, LCD_D5, LCD_D6, LCD_D7 };
 LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
 LED led(LED1);
-SharedSPI spi(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
-
-TMC2130 test(*spi.getInterface(MOTOR1_CS), MOTOR1_STEP, MOTOR1_DIR, MOTOR1_DIAG,
-		MOTOR1_IREF);
-TMC2130 test2(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP, NC, NC, NC);
-
-class _Axis: public Axis {
-public:
-	_Axis() :
-			Axis(800, &test) {
-	}
-	virtual void idle_mode() {
-		((TMC2130*) stepper)->setStealthChop(false);
-		stepper->setCurrent(0.3);
-		stepper->setMicroStep(256);
-	}
-	virtual void slew_mode() {
-		((TMC2130*) stepper)->setStealthChop(false);
-		stepper->setCurrent(0.7);
-		stepper->setMicroStep(32);
-	}
-	virtual void track_mode() {
-		((TMC2130*) stepper)->setStealthChop(true);
-		stepper->setCurrent(0.3);
-		stepper->setMicroStep(256);
-	}
-} test_axis;
+//SharedSPI spi(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
+//
+//TMC2130 test(*spi.getInterface(MOTOR1_CS), MOTOR1_STEP, MOTOR1_DIR, MOTOR1_DIAG,
+//		MOTOR1_IREF);
+//TMC2130 test2(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP, NC, NC, NC);
+//
+//class _Axis: public Axis {
+//public:
+//	_Axis() :
+//			Axis(800, &test) {
+//	}
+//	virtual void idle_mode() {
+//		((TMC2130*) stepper)->setStealthChop(false);
+//		stepper->setCurrent(0.3);
+//		stepper->setMicroStep(256);
+//	}
+//	virtual void slew_mode() {
+//		((TMC2130*) stepper)->setStealthChop(false);
+//		stepper->setCurrent(0.7);
+//		stepper->setMicroStep(32);
+//	}
+//	virtual void track_mode() {
+//		((TMC2130*) stepper)->setStealthChop(true);
+//		stepper->setCurrent(0.3);
+//		stepper->setMicroStep(256);
+//	}
+//} test_axis;
 //DigitalOut dk(MOTOR1_IREF, 0);
 
 //PwmOut lp1(MOTOR1_STEP);
@@ -188,7 +189,7 @@ void blinker() {
 		wait(0.2);
 		led.off();
 		wait(0.2);
-		test.debug();
+//		test.debug();
 	}
 }
 
@@ -205,6 +206,10 @@ int main() {
 //	set_time(186786934);
 
 	lcd.setBrightness(0.4);
+//	NVStore::get_instance().reset();
+
+	telescopeHardwareInit();
+	telescopeServerInit();
 
 //	test.poweron();
 //	test.setMicroStep(64);
@@ -213,7 +218,7 @@ int main() {
 //	test.setFrequency(1600);
 //	test_axis.startTracking(AXIS_ROTATE_POSITIVE);
 //	test_axis.setSlewSpeed(6);
-	TelescopeConfiguration::setDouble("goto_slew_speed", 4);
+//	TelescopeConfiguration::setDouble("goto_slew_speed", 4);
 //	test_axis.startSlewingIndefinite(AXIS_ROTATE_POSITIVE);
 
 	while (1) {
@@ -237,13 +242,13 @@ int main() {
 //		test.stop();
 //		wait(5);
 
-		test_axis.slewTo(AXIS_ROTATE_POSITIVE, 10);
-		wait(2);
-		test_axis.slewTo(AXIS_ROTATE_NEGATIVE, 0);
+//		test_axis.slewTo(AXIS_ROTATE_POSITIVE, 10);
+//		wait(2);
+//		test_axis.slewTo(AXIS_ROTATE_NEGATIVE, 0);
 
 //		test_axis.startTracking(AXIS_ROTATE_POSITIVE);
 //		wait(10);
-		test_axis.stop();
+//		test_axis.stop();
 //		test.poweroff();
 	}
 }
