@@ -9,8 +9,8 @@
 
 using namespace mbed;
 
-SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq) :
-		spi(mosi, miso, sclk, NC), polarity(false), num_ifcs(0) {
+SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq, bool pol) :
+		spi(mosi, miso, sclk, NC), polarity(pol), num_ifcs(0) {
 	spi.format(bit, mode);
 	spi.frequency(freq);
 }

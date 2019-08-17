@@ -38,7 +38,7 @@
 #define RSENSE	0.15
 
 // Use freewheel or not. 0 to turn off, 1-3 to use FREEWHEEL, LS brake or HS brake
-#define FREEWHEEL 0
+#define FREEWHEEL 1
 
 // Percentage of Hold current
 #define IHOLD_PERCENT	0.4
@@ -62,23 +62,21 @@
 
 TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref,
 		bool invert) :
-		StepperMotor(invert), spi(spi), step(step), dir(dir), err(err), iref(
+		StepperMotor(invert), spi(spi), step(step), dir(dir), err(err, PullUp), iref(
 		NULL), status(IDLE), inc(1), stepCount(0), eq_thread(
 				osPriorityAboveNormal), cb(NULL) {
 	useDir = (dir != NC);
 	useErr = (err != NC);
 	useIref = (iref != NC);
-//	spi.format(8, 3); // 8-bit, Mode 3
-//	spi.frequency(1000000); // 1MHz clock
 
-// Stop the steps
+	// Stop the stepping
 	this->step.stop();
 
 	if (useDir)
 		this->dir = 0;
 
 	// Register values
-	CHOPCONF_VALUE = 0x200101C3 | (VSENSE << 17) | (INTERP << 28) | (1 << 30); //DOUBLE edge, TOFF=3, HSTRT=4, HEND=3, TBL=2, CHM=0 (spreadCycle)
+	CHOPCONF_VALUE = 0x300101C3 | (VSENSE << 17) | (INTERP << 28) | (1 << 30); //DOUBLE edge, TOFF=3, HSTRT=4, HEND=3, TBL=2, CHM=0 (spreadCycle)
 	GCONF_VALUE = 0x00000000; // disable stealthChop/
 	PWMCONF_VALUE = 0x00050480 | (FREEWHEEL << 20); // PWM_CONF: Default value + Freewheel: LS brake
 	IHOLD_IRUN_VALUE = ((FREEWHEEL ? 0 : uint8_t(31 * IHOLD_PERCENT)) << 0)

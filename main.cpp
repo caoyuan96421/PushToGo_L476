@@ -5,6 +5,7 @@
 #include "LCD1602.h"
 #include "LED.h"
 #include "TMC2130.h"
+#include "iCLNGAbsEncoder.h"
 #include "SharedSPI.h"
 #include "Axis.h"
 #include "TelescopeConfiguration.h"
@@ -16,39 +17,16 @@ FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 PinName lcdpins[] = { NC, NC, NC, NC, LCD_D4, LCD_D5, LCD_D6, LCD_D7 };
 LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
 LED led(LED1);
+
+//SPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, ENCODER1_CS);
+//SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 0, 1000000, true);
+
 //SharedSPI spi(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
 //
 //TMC2130 test(*spi.getInterface(MOTOR1_CS), MOTOR1_STEP, MOTOR1_DIR, MOTOR1_DIAG,
 //		MOTOR1_IREF);
 //TMC2130 test2(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP, NC, NC, NC);
 //
-//class _Axis: public Axis {
-//public:
-//	_Axis() :
-//			Axis(800, &test) {
-//	}
-//	virtual void idle_mode() {
-//		((TMC2130*) stepper)->setStealthChop(false);
-//		stepper->setCurrent(0.3);
-//		stepper->setMicroStep(256);
-//	}
-//	virtual void slew_mode() {
-//		((TMC2130*) stepper)->setStealthChop(false);
-//		stepper->setCurrent(0.7);
-//		stepper->setMicroStep(32);
-//	}
-//	virtual void track_mode() {
-//		((TMC2130*) stepper)->setStealthChop(true);
-//		stepper->setCurrent(0.3);
-//		stepper->setMicroStep(256);
-//	}
-//} test_axis;
-//DigitalOut dk(MOTOR1_IREF, 0);
-
-//PwmOut lp1(MOTOR1_STEP);
-
-//const char s[] = "qwertyuioasdfhzxcvnmb,z ljzxcl v.zxcv lau46o5t ualsd7ugou zxjncbvlk 7uzxoibuj lkajklsdg yu8ozpfsugob jzxlcj vlk jzxklcbv7 890zxc7ubvo jzxclbvjkl; zxunc0b987 890zpxc87bvo zhxclv jlzxjvio zx7b890p7u zxo0cbhj lkzxcjgkljzsop89g 7zsf90d78g90p zdujflgbknzjkl;dfhjg9 8pz7sr0gt n8aeorg;zsdfr fgkl;zjxkl;fvj oipzxc7v09- 7890-347850-9b8 a340tajsrklg jklzsjg 7z89fdg790- a0243 t50ja34o5 jaer9-t8 0=afsujvgoipj zkopxjcvk jz90x=c8 ";
-
 Timer us_ticker;
 
 Thread rd_thd;
@@ -130,12 +108,12 @@ extern "C" void mbed_die(void) {
 			wait_us(150000);
 		}
 
-		for (int i = 0; i < 4; ++i) {
-			gpio_write(&led_err, 1);
-			wait_us(400000);
-			gpio_write(&led_err, 0);
-			wait_us(400000);
-		}
+//		for (int i = 0; i < 4; ++i) {
+//			gpio_write(&led_err, 1);
+//			wait_us(400000);
+//			gpio_write(&led_err, 0);
+//			wait_us(400000);
+//		}
 	}
 }
 
@@ -152,27 +130,42 @@ extern "C" void error(const char *format, ...) {
 	}
 	va_end(arg);
 
-	// Print multi-row message
-	int row = 0;
-	char *p = buffer;
-	while (size > 0) {
-		lcd.setPosition(row, 0);
-		lcd.write(p, size < 16 ? size : 16);
-		p += 16;
-		size -= 16;
-		row++;
-		if (row == 2 && size > 0) {
-			// Scroll
-			wait_us(1000000);
-			lcd.clear();
-			lcd.setPosition(0, 0);
-			lcd.write(p - 16, 16);
-			row = 1;
+
+	gpio_t led_err;
+	gpio_init_out(&led_err, LED3);
+
+	while(1){
+		for (int i = 0; i < 5; ++i) {
+			gpio_write(&led_err, 1);
+			wait_us(150000);
+			gpio_write(&led_err, 0);
+			wait_us(150000);
+		}
+
+		lcd.clear();
+		// Print multi-row message
+		int row = 0;
+		char *p = buffer;
+		int ss = size;
+		while (ss > 0) {
+			lcd.setPosition(row, 0);
+			lcd.write(p, ss < 16 ? ss : 16);
+			p += 16;
+			ss -= 16;
+			row++;
+			if (row == 2 && ss > 0) {
+				// Scroll
+				wait_us(1000000);
+				lcd.clear();
+				lcd.setPosition(0, 0);
+				lcd.write(p - 16, 16);
+				row = 1;
+			}
 		}
 	}
 #endif
 
-	mbed_die();
+//	mbed_die();
 
 	core_util_critical_section_exit(); // Will not reach here
 }
@@ -211,6 +204,8 @@ int main() {
 	telescopeHardwareInit();
 	telescopeServerInit();
 
+//	int x = encoder.readPos();
+
 //	test.poweron();
 //	test.setMicroStep(64);
 //
@@ -220,14 +215,20 @@ int main() {
 //	test_axis.setSlewSpeed(6);
 //	TelescopeConfiguration::setDouble("goto_slew_speed", 4);
 //	test_axis.startSlewingIndefinite(AXIS_ROTATE_POSITIVE);
+	int last = 0;
 
 	while (1) {
 //		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
 		ThisThread::sleep_for(200);
-		time_t t = time(NULL);
-		lcd.setPosition(0, 0);
-		lcd.printf("%lld", t);
+//		time_t t = time(NULL);
+//		lcd.clear();
+//		lcd.setPosition(0, 0);
+//		int now = encoder.readPos();
+//		lcd.printf("%5d", now);
+//		lcd.setPosition(1, 0);
+//		lcd.printf("%5d", now - last);
+//		last = now;
 //		pcprintf("%lld\r\n", t);
 //		test.testmove();
 //		Thread::wait(500);

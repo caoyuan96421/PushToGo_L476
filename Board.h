@@ -98,4 +98,13 @@
 #define HC_RX	PC_11
 #endif
 
+// Encoder definition
+#if defined(BOARD_USE_ENCODER) && BOARD_USE_ENCODER
+#define ENCODER_MOSI		PC_3
+#define ENCODER_MISO		PC_2
+#define ENCODER_SCK			PB_10
+#define ENCODER1_CS			PC_1
+#define ENCODER2_CS			PC_4
+#endif
+
 #endif /* BOARD_H_ */

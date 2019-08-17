@@ -4,6 +4,7 @@
 
 #include "telescope_hardware.h"
 #include "TMC2130.h"
+#include "iCLNGAbsEncoder.h"
 #include "EquatorialMount.h"
 #include "RTCClock.h"
 #include "TelescopeConfiguration.h"
@@ -15,9 +16,12 @@
 #include "Axis.h"
 
 // Motor SPI
-SharedSPI spi(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
+SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
 
-class DummyStepper : public StepperMotor {
+// Encoder SPI
+SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 0, 1000000, true);
+
+class DummyStepper: public StepperMotor {
 public:
 	DummyStepper() {
 		state = IDLE;
@@ -26,34 +30,41 @@ public:
 		stepCount = 0;
 		tim.start();
 	}
-	virtual ~DummyStepper(){
+	virtual ~DummyStepper() {
 	}
-	virtual void start(stepdir_t dir){
-		this->dir = dir;
-		tim.reset();
-		state = RUNNING;
+	virtual void start(stepdir_t dir) {
+		if (state == IDLE) {
+			this->dir = dir;
+			tim.reset();
+			state = RUNNING;
+		}
 	}
-	virtual void stop(){
-		stepCount += freq * tim.read_high_resolution_us() / 1E6;
-		state = IDLE;
+	virtual void stop() {
+		if (state == RUNNING) {
+			stepCount += freq * tim.read_high_resolution_us() / 1E6
+					* (dir == STEP_BACKWARD ? -1 : 1);
+			state = IDLE;
+		}
 	}
-	virtual double setFrequency(double freq){
-		if (RUNNING){
+	virtual double setFrequency(double freq) {
+		if (state == RUNNING) {
 			stop();
 			start(dir);
 		}
 		this->freq = freq;
 		return freq;
 	}
-	virtual double getFrequency(){
+	virtual double getFrequency() {
 		return freq;
 	}
-	virtual void setStepCount(double sc){
-		stepCount= sc;
+	virtual void setStepCount(double sc) {
+		stepCount = sc;
 	}
-	virtual double getStepCount(){
+	virtual double getStepCount() {
 		if (state == RUNNING)
-			return stepCount + freq * tim.read_high_resolution_us() / 1E6;
+			return stepCount
+					+ freq * tim.read_high_resolution_us() / 1E6
+							* (dir == STEP_BACKWARD ? -1 : 1);
 		else
 			return stepCount;
 	}
@@ -72,20 +83,92 @@ TMC2130 *ra_stepper;
 //TMC2130 *dec_stepper;
 StepperMotor *dec_stepper; // Dummy
 
+// Encoders
+iCLNGAbsEncoder *ra_encoder;
+
+#include "mbed_mktime.h"
 /**
  * Clock & Location object
  */
-RTCClock clk;
+class RTCClock_HR: public RTCClock {
+public:
+	double getTimeHighResolution() {
+		return rtc_read_hr();
+	}
+private:
+	static double rtc_read_hr(void) {
+#if TARGET_STM32F1
+
+	    RtcHandle.Instance = RTC;
+	    return RTC_ReadTimeCounter(&RtcHandle);
+
+	#else /* TARGET_STM32F1 */
+
+		struct tm timeinfo;
+
+		/* Since the shadow registers are bypassed we have to read the time twice and compare them until both times are the same */
+		uint32_t Read_time = RTC->TR & RTC_TR_RESERVED_MASK;
+		uint32_t Read_date = RTC->DR & RTC_DR_RESERVED_MASK;
+		uint32_t Read_subsec = RTC->SSR;
+
+		while ((Read_time != (RTC->TR & RTC_TR_RESERVED_MASK))
+				|| (Read_date != (RTC->DR & RTC_DR_RESERVED_MASK))
+				|| (Read_subsec != RTC->SSR)) {
+			Read_time = RTC->TR & RTC_TR_RESERVED_MASK;
+			Read_date = RTC->DR & RTC_DR_RESERVED_MASK;
+			Read_subsec = RTC->SSR;
+		}
+
+		/* Setup a tm structure based on the RTC
+		 struct tm :
+		 tm_sec      seconds after the minute 0-61
+		 tm_min      minutes after the hour 0-59
+		 tm_hour     hours since midnight 0-23
+		 tm_mday     day of the month 1-31
+		 tm_mon      months since January 0-11
+		 tm_year     years since 1900
+		 tm_yday     information is ignored by _rtc_maketime
+		 tm_wday     information is ignored by _rtc_maketime
+		 tm_isdst    information is ignored by _rtc_maketime
+		 */
+		timeinfo.tm_mday = RTC_Bcd2ToByte(
+				(uint8_t) (Read_date & (RTC_DR_DT | RTC_DR_DU)));
+		timeinfo.tm_mon = RTC_Bcd2ToByte(
+				(uint8_t) ((Read_date & (RTC_DR_MT | RTC_DR_MU)) >> 8)) - 1;
+		timeinfo.tm_year = RTC_Bcd2ToByte(
+				(uint8_t) ((Read_date & (RTC_DR_YT | RTC_DR_YU)) >> 16)) + 68;
+		timeinfo.tm_hour = RTC_Bcd2ToByte(
+				(uint8_t) ((Read_time & (RTC_TR_HT | RTC_TR_HU)) >> 16));
+		timeinfo.tm_min = RTC_Bcd2ToByte(
+				(uint8_t) ((Read_time & (RTC_TR_MNT | RTC_TR_MNU)) >> 8));
+		timeinfo.tm_sec = RTC_Bcd2ToByte(
+				(uint8_t) ((Read_time & (RTC_TR_ST | RTC_TR_SU)) >> 0));
+
+		// Convert to timestamp
+		time_t t;
+		if (_rtc_maketime(&timeinfo, &t, RTC_4_YEAR_LEAP_YEAR_SUPPORT)
+				== false) {
+			return 0;
+		}
+
+		uint32_t PREDIV_S = (RTC->PRER & RTC_PRER_PREDIV_S_Msk);
+
+		// Add fractional part
+		return (double) t + (double) (PREDIV_S - Read_subsec) / (PREDIV_S + 1);
+
+#endif /* TARGET_STM32F1 */
+	}
+} clk;
 LocationProvider location;
 
 class TMCAxis: public Axis {
 public:
-	TMCAxis(double stepsPerDeg, StepperMotor *stepper,
+	TMCAxis(double stepsPerDeg, StepperMotor *stepper, Encoder *enc = NULL,
 			const char *name = "Axis") :
-			Axis(stepsPerDeg, stepper, name) {
+			Axis(stepsPerDeg, stepper, enc, name) {
 	}
 	virtual void idle_mode() {
-		((TMC2130*) stepper)->setStealthChop(false);
+		((TMC2130*) stepper)->setStealthChop(true);
 		stepper->setCurrent(0.3);
 		stepper->setMicroStep(256);
 	}
@@ -133,16 +216,18 @@ EquatorialMount& telescopeHardwareInit() {
 			* TelescopeConfiguration::getDouble("gear_reduction")
 			* TelescopeConfiguration::getDouble("worm_teeth") / 360.0;
 
-	ra_stepper = new TMC2130(*spi.getInterface(MOTOR1_CS), MOTOR1_STEP,
-			MOTOR1_DIR, MOTOR1_DIAG,
-			MOTOR1_IREF, TelescopeConfiguration::getBool("ra_invert"));
+	ra_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER1_CS));
+
+	ra_stepper = new TMC2130(*spi1.getInterface(MOTOR1_CS), MOTOR1_STEP,
+	MOTOR1_DIR, MOTOR1_DIAG,
+	MOTOR1_IREF, TelescopeConfiguration::getBool("ra_invert"));
 //	dec_stepper = new TMC2130(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP,
 //			MOTOR2_DIR, MOTOR2_DIAG,
 //			MOTOR2_IREF, TelescopeConfiguration::getBool("dec_invert"));
 	dec_stepper = new DummyStepper();
-	ra_axis = new TMCAxis(stepsPerDeg, ra_stepper, "RA_Axis");
+	ra_axis = new TMCAxis(stepsPerDeg, ra_stepper, TelescopeConfiguration::getBool("ra_use_encoder") ? ra_encoder : NULL, "RA_Axis");
 //	dec_axis = new TMCAxis(stepsPerDeg, dec_stepper, "DEC_Axis");
-	dec_axis = new Axis(stepsPerDeg, dec_stepper, "DEC_Axis");
+	dec_axis = new Axis(stepsPerDeg, dec_stepper, NULL, "DEC_Axis");
 	eq_mount = new EquatorialMount(*ra_axis, *dec_axis, clk, location);
 
 	return (*eq_mount); // Return reference to eq_mount
