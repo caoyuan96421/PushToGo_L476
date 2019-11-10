@@ -21,7 +21,7 @@ public:
 
 	void clear();
 	void write(const char *buf, int len);
-	void printf(const char *fmt, ...);
+	void print(const char *fmt, ...);
 	void setCursor(bool on);
 	void setDisplay(bool on);
 	void setPosition(uint8_t row, uint8_t column);
@@ -29,6 +29,8 @@ public:
 	void addGlyph(char code, uint8_t glyph[]);
 
 	void setBrightness(float level);
+
+	void fillWith(char ch, int cnt);
 
 private:
 	enum RAM {

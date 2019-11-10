@@ -6,13 +6,15 @@
  */
 
 #include "SharedSPI.h"
+#include "pinmap.h"
 
 using namespace mbed;
 
-SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq, bool pol) :
+SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq, bool pol, PinMode pinMode) :
 		spi(mosi, miso, sclk, NC), polarity(pol), num_ifcs(0) {
 	spi.format(bit, mode);
 	spi.frequency(freq);
+	pin_mode(miso, pinMode);
 }
 
 SharedSPI::~SharedSPI() {

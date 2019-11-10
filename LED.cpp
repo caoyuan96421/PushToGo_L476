@@ -39,7 +39,7 @@ void LED::flash(float duration, float frequency) {
 	int64_t time_remaining_us = ceilf(duration * 1000000ULL);
 	// Start from on
 	on();
-	while (time_remaining_us > 0) {
+	while (duration < 0 || time_remaining_us > 0) {
 		wait_us(half_period_us);
 		toggle();
 		time_remaining_us -= half_period_us;
@@ -77,13 +77,13 @@ void LED::breath(float duration, float start, float end) {
 		wait(duration);
 		return;
 	}
-	const float step = 1e-3; // 1ms update, so we can use RTOS wait not hard wait
+	const float step = 10e-3; // 10ms update
 	unsigned nsteps = unsigned(duration / step);
 	float delta = (end - start) / nsteps;
 
 	*this = start;
 	for (unsigned i = 0; i < nsteps; i++) {
-		wait_ms(1);
+		wait_ms(step*1000);
 		*this = start + i * delta;
 	}
 	*this = end;

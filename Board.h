@@ -20,7 +20,7 @@
 #define BOARD_USE_BUTTON	1
 
 
-#define BOARD_VERSION 1.0
+#define BOARD_VERSION 1.5
 
 #if defined(BOARD_USE_MOTOR) && BOARD_USE_MOTOR
 
@@ -30,16 +30,16 @@
 #define MOTOR_MISO		PA_6
 
 // Motor1 (RA)
-#define MOTOR1_CS		PB_6
-#define MOTOR1_STEP		PB_2
-#define MOTOR1_DIR		PC_7
-#define MOTOR1_IREF		PB_7
+#define MOTOR1_CS		PB_1
+#define MOTOR1_STEP		PB_9		// TIM4
+#define MOTOR1_DIR		NC
+#define MOTOR1_IREF		PB_7_ALT0	// TIM17
 #define MOTOR1_DIAG		PD_2
 
-#define MOTOR2_CS		PA_8
-#define MOTOR2_STEP		PB_0
+#define MOTOR2_CS		PA_10
+#define MOTOR2_STEP		PB_6_ALT0	// TIM16
 #define MOTOR2_DIR		NC
-#define MOTOR2_IREF		PB_6
+#define MOTOR2_IREF		PB_0_ALT0	// TIM3
 #define MOTOR2_DIAG		PA_15
 
 #endif
@@ -49,12 +49,12 @@
 #define LCD_USE_4W	1
 
 // LCD1602 connections
-#define LCD_RS	PC_8
-#define LCD_RW	PC_6
-#define LCD_EN	PC_9
-#define LCD_D4	PB_8
-#define LCD_D5	PC_5
-#define LCD_D6	PB_9
+#define LCD_RS	PB_2
+#define LCD_RW	PC_8
+#define LCD_EN	PC_6
+#define LCD_D4	PC_9
+#define LCD_D5	PB_8
+#define LCD_D6	PC_5
 #define LCD_D7	PB_12
 
 // Only define D0-3 if not using 4W mode
@@ -77,18 +77,20 @@
 // LED related definitions
 #if defined(BOARD_USE_LED) && BOARD_USE_LED
 
-#define LED1	PB_13
-#define LED2	PB_14
-#define LED3	PB_15
+#define LED1	PB_15_ALT1				// TIM15
+#define LED2	PA_8					// TIM1
+#define LED3	PC_7_ALT0				// TIM8
 
 #endif
 
 // BUTTON related definitions
 #if defined(BOARD_USE_BUTTON) && BOARD_USE_BUTTON
 
-#define BUTTON1	PA_0
-#define BUTTON2	PC_13
-#define BUTTON3	PC_12
+#define BUTTON_NUM	3
+#define BUTTON1		PA_0
+#define BUTTON2		PC_13
+#define BUTTON3		PC_12
+static const PinName Button_All[] = {BUTTON1, BUTTON2, BUTTON3};
 
 #endif
 

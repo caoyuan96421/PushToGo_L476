@@ -49,7 +49,7 @@ void iCLNGAbsEncoder::activate(bool rapa) {
 }
 
 uint16_t iCLNGAbsEncoder::get_sensor_data() {
-	char tx[2], rx[2];
+	char tx[2]={0}, rx[2];
 	spi_xchg(2, READ_SENSOR, tx, rx);
 	return (uint16_t) rx[1] | ((uint16_t) rx[0] << 8); // Big endian
 }

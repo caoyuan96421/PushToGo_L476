@@ -8,15 +8,19 @@
 #include "iCLNGAbsEncoder.h"
 #include "SharedSPI.h"
 #include "Axis.h"
-#include "TelescopeConfiguration.h"
-#include "telescope_hardware.h"
+#include "pushtogo.h"
+#include "PushToGoGUI.h"
+#include "Buttons.h"
+#include "ADL355.h"
+#include "printf.h"
+#include "USBSerial.h"
 
 //FastSerial<UART_3> uart3(PC_10, PC_11, 115200);
 //FastSerial<UART_5> uart5(PC_12, PD_2, 115200);
 FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 PinName lcdpins[] = { NC, NC, NC, NC, LCD_D4, LCD_D5, LCD_D6, LCD_D7 };
 LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
-LED led(LED1);
+//ADL355 accel(PB_14, PB_13);
 
 //SPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, ENCODER1_CS);
 //SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 0, 1000000, true);
@@ -27,37 +31,13 @@ LED led(LED1);
 //		MOTOR1_IREF);
 //TMC2130 test2(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP, NC, NC, NC);
 //
-Timer us_ticker;
+//Timer us_ticker;
 
-Thread rd_thd;
+//Thread rd_thd;
 
 //void re_cb(int flag){
 //	rd_thd.flags_set(0x7FFFFFFF);
 //}
-
-volatile unsigned int *DWT_CYCCNT;
-volatile unsigned int *DWT_CONTROL;
-volatile unsigned int *SCB_DEMCR;
-void reset_timer() {
-	DWT_CYCCNT = (volatile unsigned int*) 0xE0001004; //address of the register
-	DWT_CONTROL = (volatile unsigned int*) 0xE0001000; //address of the register
-	SCB_DEMCR = (volatile unsigned int*) 0xE000EDFC; //address of the register
-	*SCB_DEMCR = *SCB_DEMCR | 0x01000000;
-	*DWT_CYCCNT = 0; // reset the counter
-//    *DWT_CONTROL = 0;
-}
-
-void start_timer() {
-	*DWT_CONTROL = *DWT_CONTROL | 1; // enable the counter
-}
-
-void stop_timer() {
-	*DWT_CONTROL = *DWT_CONTROL | 0; // disable the counter
-}
-
-inline uint32_t get_tick() {
-	return *DWT_CYCCNT;
-}
 
 void pcprintf(const char *fmt, ...) {
 	char buf[1024];
@@ -176,60 +156,107 @@ extern "C" MBED_NORETURN mbed_error_status_t mbed_error(
 	error("Error: 0x%x, %s", error_status, error_msg);
 }
 
-void blinker() {
+
+EquatorialMount *eqMount;
+extern USBSerial *serial_usb;
+Thread led1_thread(osPriorityBelowNormal, OS_STACK_SIZE, NULL, "LED1 thread");
+Thread led2_thread(osPriorityBelowNormal, OS_STACK_SIZE, NULL, "LED2 thread");
+
+
+LED led1(LED1);
+LED led2(LED2);
+
+PushToGo_GUI *gui;
+
+Buttons buttons;
+
+void led1_thread_entry() {
+	float val = 0;
+	int step = 10; // ms
+	int dir = 1;
 	while (1) {
-		led.on();
-		wait(0.2);
-		led.off();
-		wait(0.2);
-//		test.debug();
+		mountstatus_t status = eqMount->getStatus();
+		switch(status){
+		case MOUNT_TRACKING:
+		case MOUNT_TRACKING_GUIDING:
+			val += dir * 0.01;
+			if (val > 1){
+				val = 1;
+				dir = -1;
+			}
+			else if (val < 0){
+				val	= 0;
+				dir = 1;
+			}
+			led1 = val;
+			wait_ms(step);
+			break;
+		case MOUNT_SLEWING:
+		case MOUNT_NUDGING:
+		case MOUNT_NUDGING_TRACKING:
+			led1.on();
+			wait_ms(100);
+			led1.off();
+			wait_ms(100);
+			break;
+		case MOUNT_STOPPED:
+			led1.off();
+			wait_ms(100);
+			break;
+		}
 	}
 }
 
-Thread blinker_thread;
+void _usb_cb(){
+	led2=0.5;
+}
+
+void led2_thread_entry() {
+	serial_usb->attach(_usb_cb);
+	while(1){
+		if (led2){
+			wait_ms(200);
+			led2=0;
+		}
+		wait_ms(10);
+	}
+}
 
 int main() {
-	reset_timer();
-	start_timer();
-	blinker_thread.start(blinker);
-	pc.write("start\r\n", 8);
-//	rd_thd.start(reader);
-	us_ticker.start();
-//	uart3.set_blocking(false);
-//	set_time(186786934);
-
-	lcd.setBrightness(0.4);
 //	NVStore::get_instance().reset();
 
-	telescopeHardwareInit();
+	eqMount = &telescopeHardwareInit();
 	telescopeServerInit();
 
-//	int x = encoder.readPos();
+	gui = new PushToGo_GUI(&lcd, eqMount);
+	gui->listenTo(&buttons);
+	gui->startGUI();
 
-//	test.poweron();
-//	test.setMicroStep(64);
-//
-//	test.setCurrent(0.4);
-//	test.setFrequency(1600);
-//	test_axis.startTracking(AXIS_ROTATE_POSITIVE);
-//	test_axis.setSlewSpeed(6);
-//	TelescopeConfiguration::setDouble("goto_slew_speed", 4);
-//	test_axis.startSlewingIndefinite(AXIS_ROTATE_POSITIVE);
-	int last = 0;
+
+	// Start LED1 thread
+	led1_thread.start(led1_thread_entry);
+	// Start LED2 thread
+	led2_thread.start(led2_thread_entry);
+
 
 	while (1) {
 //		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
-		ThisThread::sleep_for(200);
+		ThisThread::sleep_for(100);
+//		double x, y, z;
+//		accel.getAcceleration(x, y, z);
+//		accel.getTilt(x,y);
 //		time_t t = time(NULL);
 //		lcd.clear();
 //		lcd.setPosition(0, 0);
-//		int now = encoder.readPos();
+//		int now = dec_encoder->readPos();
 //		lcd.printf("%5d", now);
+//		lcd.fillWith(' ', 5);
 //		lcd.setPosition(1, 0);
 //		lcd.printf("%5d", now - last);
 //		last = now;
-//		pcprintf("%lld\r\n", t);
+//		pcprintf("x=%lf y=%lf z=%lf\r\n", x, y, z);
+//		pcprintf("x=%lf y=%lf\r\n", x, y);
 //		test.testmove();
 //		Thread::wait(500);
 //		test.stop();

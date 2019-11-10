@@ -35,7 +35,7 @@
 #define TMC2130_LOST_STEPS		0x73
 
 // Sense resistor value. Change if using a different one
-#define RSENSE	0.15
+#define RSENSE	0.33
 
 // Use freewheel or not. 0 to turn off, 1-3 to use FREEWHEEL, LS brake or HS brake
 #define FREEWHEEL 1
@@ -64,7 +64,7 @@ TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref,
 		bool invert) :
 		StepperMotor(invert), spi(spi), step(step), dir(dir), err(err, PullUp), iref(
 		NULL), status(IDLE), inc(1), stepCount(0), eq_thread(
-				osPriorityAboveNormal), cb(NULL) {
+				osPriorityAboveNormal, OS_STACK_SIZE, NULL, "TMC2130_error_thd"), cb(NULL) {
 	useDir = (dir != NC);
 	useErr = (err != NC);
 	useIref = (iref != NC);
@@ -201,6 +201,7 @@ double TMC2130::getStepCount() {
 }
 
 void TMC2130::setStepCount(double count) {
+	step.resetCount();
 	stepCount = count;
 }
 

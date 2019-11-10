@@ -67,7 +67,7 @@ inline IRQn_Type serial_get_irq_n(UARTName uart_name) {
 	return irq_n;
 }
 
-inline DMA_Channel_TypeDef *serial_get_dma_tx(UARTName uart_name,
+inline DMA_Channel_TypeDef* serial_get_dma_tx(UARTName uart_name,
 		uint32_t &request) {
 	DMA_Channel_TypeDef *dma;
 
@@ -109,9 +109,55 @@ inline DMA_Channel_TypeDef *serial_get_dma_tx(UARTName uart_name,
 		break;
 #endif
 	default:
-		dma = (DMA_Channel_TypeDef *) 0;
+		dma = (DMA_Channel_TypeDef*) 0;
 	}
+	return dma;
+}
 
+inline DMA_Channel_TypeDef* serial_get_dma_rx(UARTName uart_name,
+		uint32_t &request) {
+	DMA_Channel_TypeDef *dma;
+
+	switch (uart_name) {
+#if defined(USART1_BASE)
+	case UART_1:
+		dma = DMA1_Channel5;
+		request = 2;
+		break;
+#endif
+#if defined(USART2_BASE)
+	case UART_2:
+		dma = DMA1_Channel6;
+		request = 2;
+		break;
+#endif
+#if defined(USART3_BASE)
+	case UART_3:
+		dma = DMA1_Channel3;
+		request = 2;
+		break;
+#endif
+#if defined(UART4_BASE)
+	case UART_4:
+		dma = DMA2_Channel5;
+		request = 2;
+		break;
+#endif
+#if defined(UART5_BASE)
+	case UART_5:
+		dma = DMA2_Channel2;
+		request = 2;
+		break;
+#endif
+#if defined(LPUART1_BASE)
+	case LPUART_1:
+		dma = DMA2_Channel7;
+		request = 4;
+		break;
+#endif
+	default:
+		dma = (DMA_Channel_TypeDef*) 0;
+	}
 	return dma;
 }
 
@@ -182,18 +228,31 @@ public:
 		MBED_ASSERT(_serial.serial.uart == uart); // Make sure we're dealing with the same thing
 
 		// DMA initialization
-		DMA_InitTypeDef &d = tx_dma.Init;
-		d.Direction = DMA_MEMORY_TO_PERIPH;
-		d.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-		d.MemInc = DMA_MINC_ENABLE;
-		d.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-		d.PeriphInc = DMA_PINC_DISABLE;
-		d.Mode = DMA_NORMAL;
-		d.Priority = DMA_PRIORITY_MEDIUM;
+		DMA_InitTypeDef &dtx = tx_dma.Init;
+		dtx.Direction = DMA_MEMORY_TO_PERIPH;
+		dtx.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		dtx.MemInc = DMA_MINC_ENABLE;
+		dtx.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		dtx.PeriphInc = DMA_PINC_DISABLE;
+		dtx.Mode = DMA_NORMAL;
+		dtx.Priority = DMA_PRIORITY_MEDIUM;
 
-		tx_dma.Instance = serial_get_dma_tx(uart, d.Request);
+		tx_dma.Instance = serial_get_dma_tx(uart, dtx.Request);
 		huart->hdmatx = &tx_dma;
 		tx_dma.Parent = huart;
+
+		DMA_InitTypeDef &drx = rx_dma.Init;
+		drx.Direction = DMA_PERIPH_TO_MEMORY;
+		drx.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		drx.MemInc = DMA_MINC_ENABLE;
+		drx.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		drx.PeriphInc = DMA_PINC_DISABLE;
+		drx.Mode = DMA_CIRCULAR;
+		drx.Priority = DMA_PRIORITY_MEDIUM;
+
+		rx_dma.Instance = serial_get_dma_rx(uart, drx.Request);
+		huart->hdmarx = &rx_dma;
+		rx_dma.Parent = huart;
 
 		if ((uint32_t) tx_dma.Instance < (uint32_t) (DMA2_Channel1)) {
 			__HAL_RCC_DMA1_CLK_ENABLE()
@@ -205,6 +264,16 @@ public:
 
 		HAL_DMA_Init(&tx_dma);
 
+		if ((uint32_t) rx_dma.Instance < (uint32_t) (DMA2_Channel1)) {
+			__HAL_RCC_DMA1_CLK_ENABLE()
+			;
+		} else {
+			__HAL_RCC_DMA2_CLK_ENABLE()
+			;
+		}
+
+		HAL_DMA_Init(&rx_dma);
+
 		//  UART IRQ
 		IRQn_Type irq_n = serial_get_irq_n(uart);
 		NVIC_ClearPendingIRQ(irq_n);
@@ -213,7 +282,7 @@ public:
 		NVIC_SetVector(irq_n, (uint32_t) irq_entry);
 		NVIC_EnableIRQ(irq_n);
 
-		// DMA IRQ
+		// TX DMA IRQ
 		irq_n = dma_irqn(tx_dma.Instance);
 		NVIC_ClearPendingIRQ(irq_n);
 		NVIC_DisableIRQ(irq_n);
@@ -221,11 +290,23 @@ public:
 		NVIC_SetVector(irq_n, (uint32_t) irq_dma_tx_entry);
 		NVIC_EnableIRQ(irq_n);
 
+		// RX DMA IRQ
+		irq_n = dma_irqn(rx_dma.Instance);
+		NVIC_ClearPendingIRQ(irq_n);
+		NVIC_DisableIRQ(irq_n);
+		NVIC_SetPriority(irq_n, 10);
+		NVIC_SetVector(irq_n, (uint32_t) irq_dma_rx_entry);
+		NVIC_EnableIRQ(irq_n);
+
 		instance = this;
 
 		// Enable RX immediately
-		HAL_UART_Receive_IT(huart, (uint8_t*) rx_start,
-		MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE - 1);
+		// Since we're using circular mode, it should run forever
+		HAL_UART_Receive_DMA(huart, (uint8_t*) rx_start,
+		MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE);
+
+		// Enable RX interrupt for each byte
+		SET_BIT(huart->Instance->CR1, USART_CR1_RXNEIE);
 	}
 
 	virtual ~FastSerial() {
@@ -267,7 +348,7 @@ public:
 				length = (length < capacity) ? length : capacity; // Write partial
 			}
 		}
-		unsigned char *p = (unsigned char *) buffer;
+		unsigned char *p = (unsigned char*) buffer;
 
 		while (length > 0) {
 			size_t capacity = capacity_tx();
@@ -338,7 +419,7 @@ public:
 			rtos::ThisThread::flags_clear(FASTSERIAL_SIGNAL_RX_AVAILABLE);
 		}
 		core_util_critical_section_enter();
-		unsigned char *p = (unsigned char *) buffer;
+		unsigned char *p = (unsigned char*) buffer;
 		while (length > 0) {
 			size_t available = available_rx();
 			// First read all available data up to length
@@ -349,21 +430,21 @@ public:
 				if (rx_head == rx_end)
 					rx_head = rx_start;
 			}
-			// Init next receive if not so
-			if (huart->RxState == HAL_UART_STATE_READY) {
-				// No ongoing reception
-				size_t rx_len;
-				if (rx_tail < rx_head) {
-					rx_len = rx_head - rx_tail - 1;
-				} else {
-					if (rx_head != rx_start)
-						rx_len = rx_end - rx_tail;
-					else
-						rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
-				}
-
-				HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len); // Start receive
-			}
+//			// Init next receive if not so
+//			if (huart->RxState == HAL_UART_STATE_READY) {
+//				// No ongoing reception
+//				size_t rx_len;
+//				if (rx_tail < rx_head) {
+//					rx_len = rx_head - rx_tail - 1;
+//				} else {
+//					if (rx_head != rx_start)
+//						rx_len = rx_end - rx_tail;
+//					else
+//						rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
+//				}
+//
+//				HAL_UART_Receive_DMA(huart, (uint8_t*) rx_tail, rx_len); // Start receive
+//			}
 			// Break if done
 			length -= copied;
 			if (length == 0)
@@ -566,63 +647,81 @@ private:
 	}
 
 	void isr() {
-		uint32_t serial_isr_flag = 0;
-		// Deal with only one flag per call
-		// Pre-analyze some of the flags
-		if (__HAL_UART_GET_FLAG(huart, UART_FLAG_RXNE) != RESET
-				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_RXNE) != RESET) {
-			// Received something
-			serial_isr_flag = FASTSERIAL_FLAG_RX;
-		} else if (__HAL_UART_GET_FLAG(huart, UART_FLAG_TC) != RESET
-				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TC) != RESET) {
-			// TX complete
-			serial_isr_flag = FASTSERIAL_FLAG_TX_COMPLETE;
-		}
-		// Hand over to STM HAL
-		HAL_UART_IRQHandler(huart);
-		// Error codes
-		if (huart->ErrorCode != HAL_UART_ERROR_NONE) {
-			if (huart->RxState == HAL_UART_STATE_READY) {
-				size_t rx_len = 0;
-				if (rx_tail < rx_head) {
-					rx_len = rx_head - rx_tail - 1;
-				} else {
-					if (rx_head != rx_start)
-						rx_len = rx_end - rx_tail;
-					else
-						rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
-				}
-				if (rx_len > 0) {
-					// Start next reception
-					HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len);
-				}
-			}
-		} else if (serial_isr_flag == FASTSERIAL_FLAG_RX) { // Received something
-			rx_tail++; // Push the queue
+		uint32_t isrflags = READ_REG(huart->Instance->ISR);
+		uint32_t errorflags;
+		bool start_rx = false;
+		bool start_tx = false;
+
+		/* If no error occurs */
+		errorflags = (isrflags
+				& (uint32_t) (USART_ISR_PE | USART_ISR_FE | USART_ISR_ORE
+						| USART_ISR_NE));
+
+		// Deal with RX
+		if (errorflags) {
+			// Error occured, clear error messages
+			__HAL_UART_CLEAR_FLAG(huart,
+					UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF);
+			HAL_UART_AbortReceive(huart);
+			// Discard all data in the buffer
+			rx_head = rx_tail = rx_start;
+			start_rx = true;
+		} else if (__HAL_UART_GET_IT_SOURCE(huart, UART_IT_RXNE) != RESET) { // We're not checking the isr flag, because it's auto cleared by DMA
+			// New bytes received
+			// Clear the irq flag
+			__HAL_UART_SEND_REQ(huart, UART_RXDATA_FLUSH_REQUEST);
+
+			int avail_before = available_rx();
+
+			// Calculate the new tail of the queue from DMA pointer
+			rx_tail = rx_start
+					+ (MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE
+							- rx_dma.Instance->CNDTR);
 			if (rx_tail == rx_end)
 				rx_tail = rx_start;
+			if (avail_before > available_rx()) { // Overrun occurred. Discard old data
+				rx_head = rx_tail + 1;
+				if (rx_head == rx_end)
+					rx_head = rx_start;
+			}
+
 			// Signal the waiting thread
 			if (rx_thread) {
 				osThreadFlagsSet(rx_thread, FASTSERIAL_SIGNAL_RX_AVAILABLE);
 				rx_thread = NULL; // Can be only set once
 			}
-			if (huart->RxState == HAL_UART_STATE_READY) {
-				size_t rx_len = 0;
-				if (rx_tail < rx_head) {
-					rx_len = rx_head - rx_tail - 1;
-				} else {
-					if (rx_head != rx_start)
-						rx_len = rx_end - rx_tail;
-					else
-						rx_len = rx_end - rx_tail - 1; // If rx_head=0, rx_tail=N-1, the queue is full and nothing can be read
-				}
-				if (rx_len > 0) {
-					// Start next reception
-					HAL_UART_Receive_IT(huart, (uint8_t*) rx_tail, rx_len);
-				}
+		}
+
+		// Deal with TX
+		if ((isrflags & UART_FLAG_TC) != RESET
+				&& __HAL_UART_GET_IT_SOURCE(huart, UART_IT_TC) != RESET) {
+			/* Disable the UART Transmit Complete Interrupt */
+			CLEAR_BIT(huart->Instance->CR1, USART_CR1_TCIE);
+
+			/* Tx process is ended, restore huart->gState to Ready */
+			huart->gState = HAL_UART_STATE_READY;
+
+			// Signal the tx_thread for completion
+			if (tx_thread) {
+				osThreadFlagsSet(tx_thread, FASTSERIAL_SIGNAL_TX_AVAILABLE);
+				tx_thread = NULL; // Can be only set once
 			}
-			return;
-		} else if (serial_isr_flag == FASTSERIAL_FLAG_TX_COMPLETE) { // TX complete, prepare next transmission
+
+			// Start next tx
+			start_tx = true;
+		}
+
+		// Start new Rx if not stopped due to error
+		if (start_rx) {
+			// Start next reception
+			HAL_UART_Receive_DMA(huart, (uint8_t*) rx_start,
+					MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE);
+			// Enable RX interrupt for each byte
+			SET_BIT(huart->Instance->CR1, USART_CR1_RXNEIE);
+		}
+
+		// Start next Tx after completion
+		if (start_tx) {
 			size_t tx_len = 0;
 			// Setup next transfer
 			tx_head += huart->TxXferSize;
@@ -635,12 +734,7 @@ private:
 			}
 			if (tx_len > 0) {
 				// Start next transmission
-				HAL_UART_Transmit_DMA(huart, (uint8_t *) tx_head, tx_len);
-			}
-			// Signal the tx_thread for completion
-			if (tx_thread) {
-				osThreadFlagsSet(tx_thread, FASTSERIAL_SIGNAL_TX_AVAILABLE);
-				tx_thread = NULL; // Can be only set once
+				HAL_UART_Transmit_DMA(huart, (uint8_t*) tx_head, tx_len);
 			}
 		}
 	}
@@ -651,6 +745,14 @@ private:
 
 	void isr_dma_tx() {
 		HAL_DMA_IRQHandler(&tx_dma);
+	}
+
+	static void irq_dma_rx_entry() {
+		instance->isr_dma_rx();
+	}
+
+	void isr_dma_rx() {
+		HAL_DMA_IRQHandler(&rx_dma);
 	}
 
 //	static serial_t _serial;

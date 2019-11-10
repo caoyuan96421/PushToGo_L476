@@ -23,7 +23,7 @@ class _NonCopyable: public NonCopyable<T> {
 class SharedSPI: private NonCopyable<SharedSPI> {
 public:
 	SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit = 8, int mode =
-			0, int freq = 100000, bool pol = false);
+			0, int freq = 100000, bool pol = false, PinMode pinMode = PullNone);
 	virtual ~SharedSPI();
 
 	/**

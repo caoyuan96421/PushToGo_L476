@@ -19,7 +19,8 @@
 SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
 
 // Encoder SPI
-SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 0, 1000000, true);
+// Pullup on MISO
+SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 3, 4000000, true);
 
 class DummyStepper: public StepperMotor {
 public:
@@ -79,12 +80,13 @@ private:
 };
 
 // Steppers
-TMC2130 *ra_stepper;
+StepperMotor *ra_stepper;
 //TMC2130 *dec_stepper;
 StepperMotor *dec_stepper; // Dummy
 
 // Encoders
 iCLNGAbsEncoder *ra_encoder;
+iCLNGAbsEncoder *dec_encoder;
 
 #include "mbed_mktime.h"
 /**
@@ -184,7 +186,7 @@ public:
 	}
 };
 
-TMCAxis *ra_axis = NULL;
+Axis *ra_axis = NULL;
 //TMCAxis *dec_axis = NULL;
 Axis *dec_axis = NULL; // Dummy
 EquatorialMount *eq_mount = NULL;
@@ -211,23 +213,38 @@ EquatorialMount& telescopeHardwareInit() {
 	if (dec_stepper != NULL) {
 		delete dec_stepper;
 	}
+	if (ra_encoder != NULL) {
+		delete ra_encoder;
+	}
+	if (dec_encoder != NULL) {
+		delete dec_encoder;
+	}
 
 	double stepsPerDeg = TelescopeConfiguration::getDouble("motor_steps")
 			* TelescopeConfiguration::getDouble("gear_reduction")
 			* TelescopeConfiguration::getDouble("worm_teeth") / 360.0;
 
 	ra_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER1_CS));
+	dec_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER2_CS));
+
+	ra_encoder->setDirection(TelescopeConfiguration::getBool("ra_enc_invert"));
+	dec_encoder->setDirection(
+			TelescopeConfiguration::getBool("dec_enc_invert"));
 
 	ra_stepper = new TMC2130(*spi1.getInterface(MOTOR1_CS), MOTOR1_STEP,
 	MOTOR1_DIR, MOTOR1_DIAG,
 	MOTOR1_IREF, TelescopeConfiguration::getBool("ra_invert"));
-//	dec_stepper = new TMC2130(*spi.getInterface(MOTOR2_CS), MOTOR2_STEP,
-//			MOTOR2_DIR, MOTOR2_DIAG,
-//			MOTOR2_IREF, TelescopeConfiguration::getBool("dec_invert"));
-	dec_stepper = new DummyStepper();
-	ra_axis = new TMCAxis(stepsPerDeg, ra_stepper, TelescopeConfiguration::getBool("ra_use_encoder") ? ra_encoder : NULL, "RA_Axis");
-//	dec_axis = new TMCAxis(stepsPerDeg, dec_stepper, "DEC_Axis");
-	dec_axis = new Axis(stepsPerDeg, dec_stepper, NULL, "DEC_Axis");
+
+	dec_stepper = new TMC2130(*spi1.getInterface(MOTOR2_CS), MOTOR2_STEP,
+	MOTOR2_DIR, MOTOR2_DIAG,
+	MOTOR2_IREF, TelescopeConfiguration::getBool("dec_invert"));
+
+	ra_axis = new TMCAxis(stepsPerDeg, ra_stepper,
+			TelescopeConfiguration::getBool("ra_use_encoder") ?
+					ra_encoder : NULL, "RA_Axis");
+	dec_axis = new TMCAxis(stepsPerDeg, dec_stepper,
+			TelescopeConfiguration::getBool("dec_use_encoder") ?
+					dec_encoder : NULL, "DEC_Axis");
 	eq_mount = new EquatorialMount(*ra_axis, *dec_axis, clk, location);
 
 	return (*eq_mount); // Return reference to eq_mount
@@ -272,26 +289,28 @@ osStatus telescopeServerInit() {
 	return osOK;
 }
 
+#include "rtx_lib.h"
+
 static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
 		char *argv[]) {
 	const int THD_MAX = 32;
-	osThreadId thdlist[THD_MAX];
+	osThreadId_t thdlist[THD_MAX];
 	int nt = osThreadEnumerate(thdlist, THD_MAX);
 
-	stprintf(server->getStream(), "Thread list: \r\n");
+	svprintf(server, "Thread list: \r\n");
 	for (int i = 0; i < nt; i++) {
 		osThreadState_t state = osThreadGetState(thdlist[i]);
 		const char *s = "";
 		const char *n;
 		osPriority_t prio = osThreadGetPriority(thdlist[i]);
 
-		if (prio == osPriorityIdle) {
-			n = "Idle thread";
-		} else {
-			n = osThreadGetName(thdlist[i]);
-			if (n == NULL)
-				n = "System thread";
-		}
+//		if (prio == osPriorityIdle) {
+//			n = "Idle thread";
+//		} else {
+		n = osThreadGetName(thdlist[i]);
+		if (n == NULL)
+			n = "System thread";
+//		}
 
 		switch (state) {
 		case osThreadInactive:
@@ -316,8 +335,20 @@ static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
 			s = "Unknown";
 			break;
 		}
-		stprintf(server->getStream(), " - %10s 0x%08x %3d %s \r\n", s,
-				(uint32_t) thdlist[i], (int) prio, n);
+		uint32_t pc;
+
+		if (thdlist[i] == ThisThread::get_id()) {
+			uint32_t _pc;
+			__asm__ __volatile__ ("mov %0, pc" : "=r" (_pc));
+			pc = _pc;
+		} else {
+			osRtxThread_t *thd = osRtxThreadId(thdlist[i]);
+			uint32_t sp = thd->sp;
+			pc = *((uint32_t*) (sp
+					+ (((thd->stack_frame & 0x10) == 0) ? 0x78 : 0x38))); // Get PC from the stack frame
+		}
+
+		svprintf(server, " - %10s 0x%08x %3d %s \r\n", s, pc, (int) prio, n);
 	}
 
 //	stprintf(server->getStream(), "\r\nRecent CPU usage: %.1f%%\r\n",
@@ -339,7 +370,7 @@ static int eqmount_systime(EqMountServer *server, const char *cmd, int argn,
 	core_util_critical_section_exit();
 #endif
 
-	stprintf(server->getStream(), "Current UTC time: %s\r\n", buf);
+	svprintf(server, "Current UTC time: %s\r\n", buf);
 
 	return 0;
 }
@@ -353,7 +384,7 @@ static int eqmount_reboot(EqMountServer *server, const char *cmd, int argn,
 static int eqmount_save(EqMountServer *server, const char *cmd, int argn,
 		char *argv[]) {
 	if (argn != 0) {
-		stprintf(server->getStream(), "Usage: save\r\n");
+		svprintf(server, "Usage: save\r\n");
 		return -1;
 	}
 	TelescopeConfiguration::saveConfig_NV();

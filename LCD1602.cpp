@@ -7,6 +7,7 @@
 
 #include "LCD1602.h"
 #include "mbed_wait_api.h"
+#include "printf.h"
 #include <stdarg.h>
 
 LCD1602::LCD1602(PinName rs, PinName rw, PinName en, PinName d[],
@@ -46,7 +47,7 @@ void LCD1602::write(const char *buf, int len) {
 	}
 }
 
-void LCD1602::printf(const char *fmt, ...) {
+void LCD1602::print(const char *fmt, ...) {
 	char buf[128];
 	va_list args;
 	va_start(args, fmt);
@@ -64,7 +65,7 @@ void LCD1602::setCursor(bool on) {
 	if (on) {
 		command(0x0F);
 	} else {
-		command(0x0A);
+		command(0x0C);
 	}
 }
 
@@ -72,7 +73,7 @@ void LCD1602::setDisplay(bool on) {
 	if (on) {
 		command(0x08);
 	} else {
-		command(0x0A);
+		command(0x0C);
 	}
 }
 
@@ -241,4 +242,13 @@ uint8_t LCD1602::read_ram(uint8_t addr, RAM ram) {
 	uint8_t data = read_byte();
 	busy_wait();
 	return data;
+}
+
+void LCD1602::fillWith(char ch, int cnt) {
+	for (int i = 0; i < cnt; i++) {
+		rw = 0;
+		rs = 1;
+		send_byte(ch);
+		busy_wait();
+	}
 }
