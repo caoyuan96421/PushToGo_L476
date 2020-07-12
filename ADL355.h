@@ -9,18 +9,35 @@
 #define ADL355_H_
 
 #include "mbed.h"
+#include "pushtogo.h"
 
-class ADL355 : I2C{
+class ADL355: I2C, public Inclinometer {
 public:
 	ADL355(PinName sda, PinName scl);
 	virtual ~ADL355();
 
-	void getAcceleration(double &ax, double &ay, double &az);
+	bool getAcceleration(double &ax, double &ay, double &az);
 	/**
 	 * Get tilt (along x) and tip (along y)
 	 */
-	void getTilt(double &tilt, double &tip);
+	bool getTilt(double &tilt, double &tip);
+
+	/// Implements Inclinometer
+	double getTilt() {
+		return -t * 180 / M_PI;
+	}
+	void refresh() {
+		double x, y, z;
+		if (!getAcceleration(x, y, z)) {
+			return;
+		}
+		double theta = atan2(x, sqrt(y * y + z * z));
+		double phi = atan2(y, z);
+		t = asin(cos(theta) * sin(phi));
+	}
+
 private:
+	double t;
 	void write_reg(uint8_t addr, uint8_t data);
 	uint8_t read_reg(uint8_t addr);
 	void read_reg_cont(uint8_t addr, uint8_t *buf, unsigned int nbytes);

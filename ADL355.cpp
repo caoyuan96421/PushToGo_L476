@@ -15,15 +15,13 @@
 #define ADL355_PWRCTL	0x2D
 #define ADL355_XDATA3	0x08 // X,Y,Z data registers start from here
 
-ADL355::ADL355(PinName sda, PinName scl) : I2C(sda, scl) {
+ADL355::ADL355(PinName sda, PinName scl) : I2C(sda, scl), t(0) {
     pin_mode(sda, OpenDrainPullUp);
     pin_mode(scl, OpenDrainPullUp);
 
 //	frequency(400000);
-
 	// Init
 	write_reg(ADL355_FILTER, 0x0A); // LPF ~4Hz
-
 	// Start measurement
 	write_reg(ADL355_PWRCTL, 0x00); // STANDBY=0
 }
@@ -31,12 +29,21 @@ ADL355::ADL355(PinName sda, PinName scl) : I2C(sda, scl) {
 ADL355::~ADL355() {
 }
 
-void ADL355::getAcceleration(double &ax, double &ay, double &az) {
+bool ADL355::getAcceleration(double &ax, double &ay, double &az) {
+	// Init
+	write_reg(ADL355_FILTER, 0x0A); // LPF ~4Hz
+	// Start measurement
+	write_reg(ADL355_PWRCTL, 0x00); // STANDBY=0
 	// Read STATUS to force DATA_RDY to clear
 	read_reg(ADL355_STATUS);
 	// Wait for next data to be taken
+	int timeout = 500;
 	while (!(read_reg(ADL355_STATUS) & 0x01)) {
 		wait_ms(10);
+		if((timeout-=10) < 0){
+			abort_transfer();
+			return false;
+		}
 	}
 	// Read X,Y,Z data
 	uint8_t buf[9];
@@ -60,13 +67,17 @@ void ADL355::getAcceleration(double &ax, double &ay, double &az) {
 	ax = (double) dx / (1 << 19) * ADL355_FULLSCALE;
 	ay = (double) dy / (1 << 19) * ADL355_FULLSCALE;
 	az = (double) dz / (1 << 19) * ADL355_FULLSCALE;
+
+	return true;
 }
 
-void ADL355::getTilt(double &tilt_x, double &tilt_y) {
+bool ADL355::getTilt(double &tilt_x, double &tilt_y) {
 	double x,y,z;
-	getAcceleration(x,y,z);
+	if(!getAcceleration(x,y,z))
+		return false;
 	tilt_x = atan2(x, z) * 180 / M_PI;
 	tilt_y = atan2(y, z) * 180 / M_PI;
+	return true;
 }
 
 void ADL355::write_reg(uint8_t addr, uint8_t data) {

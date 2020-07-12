@@ -14,6 +14,7 @@
 #include "SharedSPI.h"
 #include "Board.h"
 #include "Axis.h"
+#include "ADL355.h"
 
 // Motor SPI
 SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
@@ -22,62 +23,62 @@ SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
 // Pullup on MISO
 SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 3, 4000000, true);
 
-class DummyStepper: public StepperMotor {
-public:
-	DummyStepper() {
-		state = IDLE;
-		dir = STEP_FORWARD;
-		freq = 0;
-		stepCount = 0;
-		tim.start();
-	}
-	virtual ~DummyStepper() {
-	}
-	virtual void start(stepdir_t dir) {
-		if (state == IDLE) {
-			this->dir = dir;
-			tim.reset();
-			state = RUNNING;
-		}
-	}
-	virtual void stop() {
-		if (state == RUNNING) {
-			stepCount += freq * tim.read_high_resolution_us() / 1E6
-					* (dir == STEP_BACKWARD ? -1 : 1);
-			state = IDLE;
-		}
-	}
-	virtual double setFrequency(double freq) {
-		if (state == RUNNING) {
-			stop();
-			start(dir);
-		}
-		this->freq = freq;
-		return freq;
-	}
-	virtual double getFrequency() {
-		return freq;
-	}
-	virtual void setStepCount(double sc) {
-		stepCount = sc;
-	}
-	virtual double getStepCount() {
-		if (state == RUNNING)
-			return stepCount
-					+ freq * tim.read_high_resolution_us() / 1E6
-							* (dir == STEP_BACKWARD ? -1 : 1);
-		else
-			return stepCount;
-	}
-private:
-	enum {
-		IDLE, RUNNING
-	} state;
-	double freq;
-	double stepCount;
-	stepdir_t dir;
-	Timer tim;
-};
+//class DummyStepper: public StepperMotor {
+//public:
+//	DummyStepper() {
+//		state = IDLE;
+//		dir = STEP_FORWARD;
+//		freq = 0;
+//		stepCount = 0;
+//		tim.start();
+//	}
+//	virtual ~DummyStepper() {
+//	}
+//	virtual void start(stepdir_t dir) {
+//		if (state == IDLE) {
+//			this->dir = dir;
+//			tim.reset();
+//			state = RUNNING;
+//		}
+//	}
+//	virtual void stop() {
+//		if (state == RUNNING) {
+//			stepCount += freq * tim.read_high_resolution_us() / 1E6
+//					* (dir == STEP_BACKWARD ? -1 : 1);
+//			state = IDLE;
+//		}
+//	}
+//	virtual double setFrequency(double freq) {
+//		if (state == RUNNING) {
+//			stop();
+//			start(dir);
+//		}
+//		this->freq = freq;
+//		return freq;
+//	}
+//	virtual double getFrequency() {
+//		return freq;
+//	}
+//	virtual void setStepCount(double sc) {
+//		stepCount = sc;
+//	}
+//	virtual double getStepCount() {
+//		if (state == RUNNING)
+//			return stepCount
+//					+ freq * tim.read_high_resolution_us() / 1E6
+//							* (dir == STEP_BACKWARD ? -1 : 1);
+//		else
+//			return stepCount;
+//	}
+//private:
+//	enum {
+//		IDLE, RUNNING
+//	} state;
+//	double freq;
+//	double stepCount;
+//	stepdir_t dir;
+//	Timer tim;
+//};
 
 // Steppers
 StepperMotor *ra_stepper;
@@ -191,6 +192,9 @@ Axis *ra_axis = NULL;
 Axis *dec_axis = NULL; // Dummy
 EquatorialMount *eq_mount = NULL;
 
+// Accelerameter
+ADL355 accel(PB_14, PB_13);
+
 static void add_sys_commands();
 
 EquatorialMount& telescopeHardwareInit() {
@@ -247,6 +251,10 @@ EquatorialMount& telescopeHardwareInit() {
 					dec_encoder : NULL, "DEC_Axis");
 	eq_mount = new EquatorialMount(*ra_axis, *dec_axis, clk, location);
 
+	// Set accelerator if available
+	eq_mount->setInclinometer(&accel);
+	eq_mount->getInclinometer()->refresh();
+
 	return (*eq_mount); // Return reference to eq_mount
 }
 
@@ -260,6 +268,7 @@ USBSerial *serial_usb = NULL;
 EqMountServer *server_usb = NULL;
 
 bool serverInitialized = false;
+
 
 osStatus telescopeServerInit() {
 	if (eq_mount == NULL)
