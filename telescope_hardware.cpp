@@ -264,7 +264,7 @@ HC_Serial *serial_hc = NULL;
 EqMountServer *server_hc = NULL;
 
 /* USB connection from PC*/
-USBSerial *serial_usb = NULL;
+USBSerial *serial_usb = new USBSerial(false);
 EqMountServer *server_usb = NULL;
 
 bool serverInitialized = false;
@@ -289,7 +289,6 @@ osStatus telescopeServerInit() {
 	server_hc->bind(*eq_mount);
 
 	if (!server_usb) {
-		serial_usb = new USBSerial(false);
 		serial_usb->connect();
 		server_usb = new EqMountServer(*serial_usb, false);
 	}
