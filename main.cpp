@@ -203,6 +203,8 @@ void led1_thread_entry() {
 			led1.off();
 			wait_ms(100);
 			break;
+		default:
+			break;
 		}
 	}
 }
