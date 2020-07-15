@@ -14,6 +14,9 @@
     "macros": [
         "DEVICE_SPI_COUNT=3",
         "MBED_CPU_STATS_ENABLED",
-        "OS_ISR_FIFO_QUEUE=64"
+        "OS_ISR_FIFO_QUEUE=64",
+        "MBED_MEM_TRACING_ENABLED=0",
+        "MBED_HEAP_STATS_ENABLED=1",
+        "MBED_STACK_STATS_ENABLED=1"
     ]
 }

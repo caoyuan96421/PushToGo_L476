@@ -30,8 +30,6 @@ public:
 	void listenTo(Buttons *btn) {
 		btn->registerListener(this);
 	}
-private:
-	LCD1602 *lcd;
 	enum ButtonEvent {
 		BUTTON_EVENT_INC = 1,
 		BUTTON_EVENT_INC_REP = BUTTON_EVENT_INC | 0x4000,
@@ -116,23 +114,6 @@ private:
 				return NULL;
 		}
 	};
-	PushToGo_MenuItem *currentDisplayMenu;
-	Thread thread;
-	Thread thd_btn_poll;
-	bool guiRunning;
-	EquatorialMount *eqMount;
-	uint64_t prev_idle_time;
-	uint64_t prev_up_time;
-	int button_state;
-	int button_last_update;
-	Queue<void, 16> btnEvtQueue;
-//	EventQueue evt_queue;
-
-	void _task_entry();
-	void _poll_entry();
-	float calc_cpu_usage();
-	void buttonStateChanged(int oldstate, int newstate);
-	static void constructMenuStructure(PushToGo_MenuItem *root);
 
 	// Default Menu item
 	struct PushToGo_MenuItem_Base: public PushToGo_MenuItem {
@@ -184,9 +165,6 @@ private:
 		int dwell_sec;
 	};
 
-	PushToGo_MenuItem_Home homeMenu;
-	PushToGo_MenuItem_Base quickMenu;
-
 	// Action Menu item
 	struct PushToGo_MenuItem_Action: public PushToGo_MenuItem_Base {
 		virtual bool reactToButton(ButtonEvent evt, PushToGo_GUI *gui);
@@ -201,6 +179,18 @@ private:
 		bool ret;
 	};
 
+	struct PushToGo_MenuItem_Action_WithConfirm: public PushToGo_MenuItem_Action {
+		PushToGo_MenuItem_Action_WithConfirm() {
+			triggered = false;
+			yesno = false;
+		}
+		virtual bool reactToButton(ButtonEvent evt, PushToGo_GUI *gui);
+		virtual void showMenu(PushToGo_GUI *gui);
+
+		bool triggered;
+		bool yesno;
+	};
+
 	struct PushToGo_MenuItem_Display: public PushToGo_MenuItem_Base {
 		PushToGo_MenuItem_Display(const char *name = "Edit") {
 			itemTitle = name;
@@ -211,6 +201,16 @@ private:
 			display(gui);
 		}
 		virtual void display(PushToGo_GUI *gui) = 0;
+	};
+
+	template<class T>
+	struct PushToGo_MenuItem_Display_Bind: public PushToGo_MenuItem_Display {
+		PushToGo_MenuItem_Display_Bind(const char *name,
+				const volatile T *target) :
+				PushToGo_MenuItem_Display(name), target(target) {
+		}
+		virtual void display(PushToGo_GUI *gui);
+		const volatile T *target;
 	};
 
 	// Generic editable menu item
@@ -281,33 +281,35 @@ private:
 	};
 
 	struct PushToGo_MenuItem_Edit_FixedPoint: public PushToGo_MenuItem_Edit {
-		PushToGo_MenuItem_Edit_FixedPoint(const char *name = "Edit", double min = 0,
-				double max = 0x7FFFFFFF, double init = 0, int prec = 2) :
-					PushToGo_MenuItem_Edit(name), max(max), min(min), precision(prec) {
-				shiftFromRight = true; // More natural for numerics
-				setValue(init);
-			}
+		PushToGo_MenuItem_Edit_FixedPoint(const char *name = "Edit",
+				double min = 0, double max = 0x7FFFFFFF, double init = 0,
+				int prec = 2) :
+				PushToGo_MenuItem_Edit(name), max(max), min(min), precision(
+						prec) {
+			shiftFromRight = true; // More natural for numerics
+			setValue(init);
+		}
 
-			virtual void valueUpdate(const char buf[]) {
-				doubleValueUpdate(strtod(buf, NULL));
-			}
+		virtual void valueUpdate(const char buf[]) {
+			doubleValueUpdate(strtod(buf, NULL));
+		}
 
-			virtual void doubleValueUpdate(double val) = 0;
-			/*
-			 * validate the data buffer. If data is invalid, it will be initialized with default value
-			 */
-			virtual void validate();
+		virtual void doubleValueUpdate(double val) = 0;
+		/*
+		 * validate the data buffer. If data is invalid, it will be initialized with default value
+		 */
+		virtual void validate();
 
-			// Inc/Dec values at a given position
-			virtual void incValue(int pos, bool fast = false);
-			virtual void decValue(int pos, bool fast = false);
+		// Inc/Dec values at a given position
+		virtual void incValue(int pos, bool fast = false);
+		virtual void decValue(int pos, bool fast = false);
 
-			void setValue(double val);
+		void setValue(double val);
 
-			double max;
-			double min;
-			int precision;
-		};
+		double max;
+		double min;
+		int precision;
+	};
 
 	struct PushToGo_MenuItem_Edit_Bool: public PushToGo_MenuItem_Edit {
 		PushToGo_MenuItem_Edit_Bool(const char *name = "Edit",
@@ -415,8 +417,39 @@ private:
 		double min, max;
 		const char *fmt;
 	};
+
+private:
+	LCD1602 *lcd;
+
+	PushToGo_MenuItem *currentDisplayMenu;
+	Thread thread;
+	Thread thd_btn_poll;
+	bool guiRunning;
+	EquatorialMount *eqMount;
+	uint64_t prev_idle_time;
+	uint64_t prev_up_time;
+	int button_state;
+	int button_last_update;
+	Queue<void, 16> btnEvtQueue;
+//	EventQueue evt_queue;
+
+	PushToGo_MenuItem_Home homeMenu;
+	PushToGo_MenuItem_Base quickMenu;
+
+	void _task_entry();
+	void _poll_entry();
+	float calc_cpu_usage();
+	void buttonStateChanged(int oldstate, int newstate);
+	static void constructMenuStructure(PushToGo_MenuItem *root);
+	static void addConfigMenu(PushToGo_MenuItem*);
+	static void addCalibrationMenu(PushToGo_MenuItem*);
+	static void addUtilitiesMenu(PushToGo_MenuItem*);
+	static void addMiscMenu(PushToGo_MenuItem*);
+	static void addDebugMenu(PushToGo_MenuItem*);
+	static void addQuickMenu(PushToGo_MenuItem*);
 };
 
 struct tm getLocalTime(time_t timestamp = 0);
+
 
 #endif /* _PUSHTOGOGUI_H_ */

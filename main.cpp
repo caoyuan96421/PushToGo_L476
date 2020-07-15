@@ -159,8 +159,8 @@ extern "C" MBED_NORETURN mbed_error_status_t mbed_error(
 
 EquatorialMount *eqMount;
 extern USBSerial *serial_usb;
-Thread led1_thread(osPriorityBelowNormal, OS_STACK_SIZE, NULL, "LED1 thread");
-Thread led2_thread(osPriorityBelowNormal, OS_STACK_SIZE, NULL, "LED2 thread");
+Thread led1_thread(osPriorityBelowNormal, 512, NULL, "LED1 thread");
+Thread led2_thread(osPriorityBelowNormal, 512, NULL, "LED2 thread");
 
 
 LED led1(LED1);
@@ -224,8 +224,11 @@ void led2_thread_entry() {
 	}
 }
 
+#include "mbed_mem_trace.h"
+
 int main() {
 //	NVStore::get_instance().reset();
+    mbed_mem_trace_set_callback(mbed_mem_trace_default_callback);
 
 	eqMount = &telescopeHardwareInit();
 	telescopeServerInit();

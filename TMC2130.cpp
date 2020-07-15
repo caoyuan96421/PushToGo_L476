@@ -64,7 +64,7 @@ TMC2130::TMC2130(SPI &spi, PinName step, PinName dir, PinName err, PinName iref,
 		bool invert) :
 		StepperMotor(invert), spi(spi), step(step), dir(dir), err(err, PullUp), iref(
 		NULL), status(IDLE), inc(1), stepCount(0), eq_thread(
-				osPriorityAboveNormal, OS_STACK_SIZE, NULL, "TMC2130_error_thd"), cb(NULL) {
+				osPriorityAboveNormal, 512, NULL, "TMC2130_error_thd"), cb(NULL) {
 	useDir = (dir != NC);
 	useErr = (err != NC);
 	useIref = (iref != NC);

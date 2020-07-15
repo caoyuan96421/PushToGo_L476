@@ -269,7 +269,6 @@ EqMountServer *server_usb = NULL;
 
 bool serverInitialized = false;
 
-
 osStatus telescopeServerInit() {
 	if (eq_mount == NULL)
 		return osErrorResource;
@@ -304,6 +303,9 @@ static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
 	const int THD_MAX = 32;
 	osThreadId_t thdlist[THD_MAX];
 	int nt = osThreadEnumerate(thdlist, THD_MAX);
+	mbed_stats_stack_t *stats = (mbed_stats_stack_t*) malloc(
+			nt * sizeof(mbed_stats_stack_t));
+	nt = mbed_stats_stack_get_each(stats, nt);
 
 	svprintf(server, "Thread list: \r\n");
 	for (int i = 0; i < nt; i++) {
@@ -356,8 +358,22 @@ static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
 					+ (((thd->stack_frame & 0x10) == 0) ? 0x78 : 0x38))); // Get PC from the stack frame
 		}
 
-		svprintf(server, " - %10s 0x%08x %3d %s \r\n", s, pc, (int) prio, n);
+		int j = 0;
+		for (j = 0; j < nt; j++)
+			if (stats[j].thread_id == (uint32_t) thdlist[i])
+				break;
+
+		svprintf(server, " - %10s 0x%08x %3d %6lu/%6lu bytes\t%s \r\n", s, pc,
+				(int) prio, stats[j].max_size, stats[j].reserved_size, n);
 	}
+
+	free(stats);
+
+	// Grab the heap statistics
+	mbed_stats_heap_t heap_stats;
+	mbed_stats_heap_get(&heap_stats);
+	svprintf(server, "Heap size: %lu / %lu bytes\r\n", heap_stats.current_size,
+			heap_stats.reserved_size);
 
 //	stprintf(server->getStream(), "\r\nRecent CPU usage: %.1f%%\r\n",
 //			MCULoadMeasurement::getInstance().getCPUUsage() * 100);

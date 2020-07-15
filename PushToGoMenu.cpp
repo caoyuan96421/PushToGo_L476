@@ -4,18 +4,9 @@
 #include "ADL355.h"
 
 extern ADL355 accel;
+//clearCalibration();
 
-void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
-	PushToGo_MenuItem_SubMenu *calibration = new PushToGo_MenuItem_SubMenu(
-			"Calibration", root);
-	PushToGo_MenuItem_SubMenu *configuration = new PushToGo_MenuItem_SubMenu(
-			"Configuration", root);
-	PushToGo_MenuItem_SubMenu *utilities = new PushToGo_MenuItem_SubMenu(
-			"Utilities", root);
-	PushToGo_MenuItem_SubMenu *misc = new PushToGo_MenuItem_SubMenu(
-			"Misc. Setting", root);
-	PushToGo_MenuItem_SubMenu *dbg = new PushToGo_MenuItem_SubMenu("Debugging",
-			root);
+void PushToGo_GUI::addConfigMenu(PushToGo_MenuItem *configuration) {
 
 	/***************Config Menu********************/
 	struct configItemInt: public PushToGo_MenuItem_Edit_Integer {
@@ -126,9 +117,12 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 		}
 		p = p->next;
 	}
+}
+
+void PushToGo_GUI::addUtilitiesMenu(PushToGo_MenuItem *utilities) {
 
 	/***************Utilities Menu********************/
-	struct gotoIndexItem: public PushToGo_MenuItem_Action {
+	struct gotoIndexItem: public PushToGo_MenuItem_Action_WithConfirm {
 		gotoIndexItem() {
 			itemTitle = "Goto Index";
 		}
@@ -140,7 +134,7 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 
 	utilities->add(gotoIndex);
 
-	struct indexItem: public PushToGo_MenuItem_Action {
+	struct indexItem: public PushToGo_MenuItem_Action_WithConfirm {
 		indexItem() {
 			itemTitle = "Set Encoder Index Position      ";
 		}
@@ -149,19 +143,157 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 			return true;
 		}
 	} *setIndex = new indexItem();
-
 	utilities->add(setIndex);
 
+	struct linkItem: public PushToGo_MenuItem_Action_WithConfirm {
+		linkItem() {
+			itemTitle = "Link Encoder Index w/ Calib.      ";
+		}
+		bool action(PushToGo_GUI *gui) {
+			gui->eqMount->setEncoderIndex();
+			return true;
+		}
+	} *linkIndex = new linkItem();
+
+	utilities->add(linkIndex);
+}
+
+void PushToGo_GUI::addCalibrationMenu(PushToGo_MenuItem *calibration) {
+
 	/***************Calibration Menu********************/
-	struct testIntItem: public PushToGo_MenuItem_Edit_Integer {
-		testIntItem() :
-				PushToGo_MenuItem_Edit_Integer("test value", -100, 100, 5) {
+
+	struct PushToGo_MenuItem_Display_Bind_TwoDouble: public PushToGo_MenuItem_Display_Bind<
+			double> {
+		PushToGo_MenuItem_Display_Bind_TwoDouble(const char *name,
+				const volatile double *a, const volatile double *b) :
+				PushToGo_MenuItem_Display_Bind<double>(name, a), target2(b) {
 		}
-		void intValueUpdate(int newval) {
-			debug_ptg(DEFAULT_DEBUG, "new value: %d\r\n", newval);
+		void display(PushToGo_GUI *gui) {
+			gui->lcd->print("%7.2f %7.2f", *target, *target2);
 		}
-	} *testint = new testIntItem();
-	calibration->add(testint);
+		const volatile double *target2;
+	};
+
+	calibration->add(
+			new PushToGo_MenuItem_Display_Bind<double>("RMS Calib. Error",
+					&calibration->getGUI()->eqMount->getCalibration().error));
+	calibration->add(
+			new PushToGo_MenuItem_Display_Bind<double>("PA Alt.",
+					&calibration->getGUI()->eqMount->getCalibration().pa.alt));
+	calibration->add(
+			new PushToGo_MenuItem_Display_Bind<double>("PA Azi.",
+					&calibration->getGUI()->eqMount->getCalibration().pa.azi));
+	calibration->add(
+			new PushToGo_MenuItem_Display_Bind_TwoDouble("Axis offset",
+					&calibration->getGUI()->eqMount->getCalibration().offset.ra_off,
+					&calibration->getGUI()->eqMount->getCalibration().offset.dec_off));
+	calibration->add(
+			new PushToGo_MenuItem_Display_Bind<double>("Cone Error",
+					&calibration->getGUI()->eqMount->getCalibration().cone));
+
+	struct clearCalibItem: public PushToGo_MenuItem_Action_WithConfirm {
+		clearCalibItem() {
+			itemTitle = "Clear Calib.";
+		}
+		bool action(PushToGo_GUI *gui) {
+			gui->eqMount->clearCalibration();
+			return true;
+		}
+	} *clearCalib = new clearCalibItem();
+	calibration->add(clearCalib);
+
+	struct showCalibStarsItem: public PushToGo_MenuItem_SubMenu {
+		showCalibStarsItem(PushToGo_MenuItem *parent = NULL) :
+				PushToGo_MenuItem_SubMenu("Show Calib. Stars", parent) {
+		}
+
+		struct calibStarItem: public PushToGo_MenuItem_SubMenu {
+			calibStarItem(int index, PushToGo_MenuItem *parent = NULL) :
+					PushToGo_MenuItem_SubMenu("", parent), index(index) {
+				char *buf = new char[16];
+				snprintf(buf, 15, "Star %d", index);
+				itemTitle = buf;
+			}
+			~calibStarItem() {
+				delete[] itemTitle;
+				for (PushToGo_MenuItem *p = firstChild, *q; p != &menuBack;) {
+					q = p->next;
+					delete p;
+					p = q;
+				}
+			}
+
+			int index;
+		};
+		struct starDisplay: public PushToGo_MenuItem_Display {
+			starDisplay(int index, const char *name, double a, double b = NAN) :
+					PushToGo_MenuItem_Display(""), a(a), b(b) {
+				char *buf = new char[16];
+				snprintf(buf, 15, "S%02d %s", index, name);
+				itemTitle = buf;
+			}
+			~starDisplay() {
+				delete[] itemTitle;
+			}
+			void display(PushToGo_GUI *gui) {
+				if (isnan(b)) {
+					// Display timestamp
+					char buf[16];
+
+					// Display current time
+					struct tm tts = getLocalTime((uint32_t) a);
+					strftime(buf, sizeof(buf), " %T %m/%d ", &tts);
+
+					gui->lcd->print("%s", buf);
+				} else {
+					gui->lcd->print("%7.2f %7.2f", a, b);
+				}
+			}
+			double a, b;
+		};
+
+//		void switchTo(PushToGo_GUI *gui) {
+//			PushToGo_MenuItem_SubMenu::switchTo(gui);
+//		}
+
+		virtual void showMenu(PushToGo_GUI *gui) {
+			PushToGo_MenuItem_Base::showMenu(gui);
+
+			gui->lcd->setPosition(1, 0);
+			gui->lcd->print("%8d star(s)", gui->eqMount->getNumAlignmentStar());
+
+			// Update calib structure
+			// First remove all child
+			PushToGo_MenuItem *p = firstChild, *q;
+			while (p != &menuBack) {
+				q = p->next;
+				delete p;
+				p = q;
+			}
+			firstChild = &menuBack;
+			menuBack.prev = NULL;
+
+			// Then add new children based on calibration
+			for (int i = 0; i < gui->eqMount->getNumAlignmentStar(); i++) {
+				PushToGo_MenuItem_SubMenu *star_menu = new calibStarItem(i,
+						this);
+				AlignmentStar *as = gui->eqMount->getAlignmentStar(i);
+				star_menu->add(
+						new starDisplay(i, "Ref. Pos.", as->star_ref.ra,
+								as->star_ref.dec));
+				star_menu->add(
+						new starDisplay(i, "Meas. Pos.", as->star_meas.ra_delta,
+								as->star_meas.dec_delta));
+				star_menu->add(
+						new starDisplay(i, "Timestamp", as->timestamp, NAN));
+			}
+		}
+
+	} *showCalib = new showCalibStarsItem(calibration); // Will be added automatically
+	(void) showCalib;
+}
+
+void PushToGo_GUI::addMiscMenu(PushToGo_MenuItem *misc) {
 
 	/***************MISC Menu********************/
 	struct dateItem: public PushToGo_MenuItem_Edit_Date {
@@ -266,8 +398,11 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 	} *refreshInc = new refreshIncItem();
 
 	misc->add(refreshInc);
+}
 
-	// Debug menu
+void PushToGo_GUI::addDebugMenu(PushToGo_MenuItem *dbg) {
+
+// Debug menu
 
 	struct dbgItem1: public PushToGo_MenuItem_Display {
 		dbgItem1() :
@@ -343,12 +478,15 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 	dbg->add(itm8);
 	dbg->add(itm6);
 	dbg->add(itm7);
+}
+
+void PushToGo_GUI::addQuickMenu(PushToGo_MenuItem *root) {
 
 	enum jogState {
 		jog_idle, jog_up, jog_down
 	};
 
-	// Quick Menu
+// Quick Menu
 	struct jogItem: public PushToGo_MenuItem_Base {
 		jogItem(bool ra) :
 				enabled(false), state(jog_idle), ra(ra) {
@@ -423,7 +561,35 @@ void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
 	root->getGUI()->quickMenu.add(jogRA);
 	root->getGUI()->quickMenu.add(jogDEC);
 
-	struct gotoIndexItem *goToIndex2 = new gotoIndexItem();
-	root->getGUI()->quickMenu.add(goToIndex2);
+	struct gotoIndexItem: public PushToGo_MenuItem_Action_WithConfirm {
+		gotoIndexItem() {
+			itemTitle = "Goto Index";
+		}
+		bool action(PushToGo_GUI *gui) {
+			gui->eqMount->goToIndex();
+			return true;
+		}
+	} *gotoIndex = new gotoIndexItem();
+	root->getGUI()->quickMenu.add(gotoIndex);
+}
 
+void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
+	PushToGo_MenuItem_SubMenu *calibration = new PushToGo_MenuItem_SubMenu(
+			"Calibration", root);
+	PushToGo_MenuItem_SubMenu *configuration = new PushToGo_MenuItem_SubMenu(
+			"Configuration", root);
+	PushToGo_MenuItem_SubMenu *utilities = new PushToGo_MenuItem_SubMenu(
+			"Utilities", root);
+	PushToGo_MenuItem_SubMenu *misc = new PushToGo_MenuItem_SubMenu(
+			"Misc. Setting", root);
+	PushToGo_MenuItem_SubMenu *dbg = new PushToGo_MenuItem_SubMenu("Debugging",
+			root);
+
+	addCalibrationMenu(calibration);
+	addConfigMenu(configuration);
+	addUtilitiesMenu(utilities);
+	addMiscMenu(misc);
+	addDebugMenu(dbg);
+
+	addQuickMenu(root);
 }

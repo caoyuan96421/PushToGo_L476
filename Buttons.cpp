@@ -10,7 +10,7 @@
 
 Buttons::Buttons() :
 		listener(NULL), evt_queue(4 * EVENTS_EVENT_SIZE), thread(
-				osPriorityAboveNormal, OS_STACK_SIZE, NULL, "btns_evt_q"), previous_state(
+				osPriorityAboveNormal, 512, NULL, "btns_evt_q"), previous_state(
 				0) {
 	for (int i = 0; i < BUTTON_NUM; i++) {
 		buttons[i] = new InterruptIn(Button_All[i], PullUp);

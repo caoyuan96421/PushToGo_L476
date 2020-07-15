@@ -41,7 +41,7 @@ PushToGo_GUI::PushToGo_GUI(LCD1602 *lcd, EquatorialMount *eq) :
 		lcd(lcd), currentDisplayMenu(&homeMenu), thread(osPriorityBelowNormal,
 		OS_STACK_SIZE, NULL, "PushToGo_GUI"), thd_btn_poll(
 				osPriorityBelowNormal,
-				OS_STACK_SIZE, NULL, "button_poll"), guiRunning(false), eqMount(
+				512, NULL, "button_poll"), guiRunning(false), eqMount(
 				eq), prev_idle_time(0), button_state(0), button_last_update(0), homeMenu(
 				this) {
 	MBED_ASSERT(lcd != NULL);
@@ -888,4 +888,67 @@ void PushToGo_GUI::PushToGo_MenuItem_Edit_FixedPoint::decValue(int pos,
 void PushToGo_GUI::PushToGo_MenuItem_Edit_FixedPoint::setValue(double val) {
 	_set_buf_double(val, disp, precision);
 	validate();
+}
+
+bool PushToGo_GUI::PushToGo_MenuItem_Action_WithConfirm::reactToButton(
+		ButtonEvent evt, PushToGo_GUI *gui) {
+	if (evt == BUTTON_EVENT_ENTER) {
+		if (!triggered){
+			triggered = true;
+			yesno = false;
+		}
+		else{
+			if (yesno) {
+				ret = action(gui);
+				dwell = ACTION_DISPLAY_DWELL_FRAME;
+			}
+			else {
+				dwell = 0;
+			}
+			triggered = false;
+		}
+		return true;
+	} else if ((evt == BUTTON_EVENT_INC || evt == BUTTON_EVENT_DEC) && triggered) {
+		// Toggle yes/no
+		yesno = !yesno;
+		return true;
+	}
+	else{
+		return false;
+	}
+}
+
+void PushToGo_GUI::PushToGo_MenuItem_Action_WithConfirm::showMenu(
+		PushToGo_GUI *gui) {
+	if (triggered){
+		gui->lcd->setPosition(0, 0);
+		gui->lcd->print("Confirm?        ");
+
+		gui->lcd->setPosition(1, 0);
+		if (yesno)
+			gui->lcd->print("             YES");
+		else
+			gui->lcd->print("              NO");
+	}
+	else{
+		PushToGo_MenuItem_Action::showMenu(gui);
+	}
+}
+
+template<>
+void PushToGo_GUI::PushToGo_MenuItem_Display_Bind<int>::display(
+		PushToGo_GUI *gui) {
+	gui->lcd->print("%16d", *target);
+}
+
+template<>
+void PushToGo_GUI::PushToGo_MenuItem_Display_Bind<double>::display(
+		PushToGo_GUI *gui) {
+	gui->lcd->print("%16.4f", *target);
+}
+
+template<>
+void PushToGo_GUI::PushToGo_MenuItem_Display_Bind<bool>::display(
+		PushToGo_GUI *gui) {
+	gui->lcd->print("%16s", (*target) ? "TRUE" : "FALSE");
 }

@@ -143,6 +143,9 @@
 // Macros
 #define DEVICE_SPI_COUNT                                                  3                                                // defined by application
 #define MBED_CPU_STATS_ENABLED                                                                                             // defined by application
+#define MBED_HEAP_STATS_ENABLED                                           1                                                // defined by application
+#define MBED_MEM_TRACING_ENABLED                                          0                                                // defined by application
+#define MBED_STACK_STATS_ENABLED                                          1                                                // defined by application
 #define OS_ISR_FIFO_QUEUE                                                 64                                               // defined by application
 #define _RTE_                                                                                                              // defined by library:rtos
 
