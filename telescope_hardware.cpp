@@ -1,9 +1,9 @@
 /**
+#include <TMC2130/TMC2130.h>
  * Harware setup is implemented in this file
  */
 
 #include "telescope_hardware.h"
-#include "TMC2130.h"
 #include "iCLNGAbsEncoder.h"
 #include "EquatorialMount.h"
 #include "RTCClock.h"
@@ -15,6 +15,7 @@
 #include "Board.h"
 #include "Axis.h"
 #include "ADL355.h"
+#include "TMC2130.h"
 
 // Motor SPI
 SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
@@ -275,7 +276,7 @@ osStatus telescopeServerInit() {
 	if (!serverInitialized) {
 		// Only run once
 		serverInitialized = true;
-		add_sys_commands();
+//		add_sys_commands();
 	} else {
 		return osErrorResource;
 	}
@@ -296,133 +297,35 @@ osStatus telescopeServerInit() {
 	return osOK;
 }
 
-#include "rtx_lib.h"
 
-static int eqmount_sys(EqMountServer *server, const char *cmd, int argn,
-		char *argv[]) {
-	const int THD_MAX = 32;
-	osThreadId_t thdlist[THD_MAX];
-	int nt = osThreadEnumerate(thdlist, THD_MAX);
-	mbed_stats_stack_t *stats = (mbed_stats_stack_t*) malloc(
-			nt * sizeof(mbed_stats_stack_t));
-	nt = mbed_stats_stack_get_each(stats, nt);
+//static int eqmount_systime(EqMountServer *server, const char *cmd, int argn,
+//		char *argv[]) {
+//	char buf[32];
+//	time_t t = time(NULL);
+//
+//#if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
+//	ctime_r(&t, buf);
+//#else
+//	core_util_critical_section_enter();
+//	char *ibuf = ctime(&t);
+//	strncpy(buf, ibuf, sizeof(buf));
+//	core_util_critical_section_exit();
+//#endif
+//
+//	svprintf(server, "Current UTC time: %s\r\n", buf);
+//
+//	return 0;
+//}
 
-	svprintf(server, "Thread list: \r\n");
-	for (int i = 0; i < nt; i++) {
-		osThreadState_t state = osThreadGetState(thdlist[i]);
-		const char *s = "";
-		const char *n;
-		osPriority_t prio = osThreadGetPriority(thdlist[i]);
 
-//		if (prio == osPriorityIdle) {
-//			n = "Idle thread";
-//		} else {
-		n = osThreadGetName(thdlist[i]);
-		if (n == NULL)
-			n = "System thread";
-//		}
-
-		switch (state) {
-		case osThreadInactive:
-			s = "Inactive";
-			break;
-		case osThreadReady:
-			s = "Ready";
-			break;
-		case osThreadRunning:
-			s = "Running";
-			break;
-		case osThreadBlocked:
-			s = "Blocked";
-			break;
-		case osThreadTerminated:
-			s = "Terminated";
-			break;
-		case osThreadError:
-			s = "Error";
-			break;
-		default:
-			s = "Unknown";
-			break;
-		}
-		uint32_t pc;
-
-		if (thdlist[i] == ThisThread::get_id()) {
-			uint32_t _pc;
-			__asm__ __volatile__ ("mov %0, pc" : "=r" (_pc));
-			pc = _pc;
-		} else {
-			osRtxThread_t *thd = osRtxThreadId(thdlist[i]);
-			uint32_t sp = thd->sp;
-			pc = *((uint32_t*) (sp
-					+ (((thd->stack_frame & 0x10) == 0) ? 0x78 : 0x38))); // Get PC from the stack frame
-		}
-
-		int j = 0;
-		for (j = 0; j < nt; j++)
-			if (stats[j].thread_id == (uint32_t) thdlist[i])
-				break;
-
-		svprintf(server, " - %10s 0x%08x %3d %6lu/%6lu bytes\t%s \r\n", s, pc,
-				(int) prio, stats[j].max_size, stats[j].reserved_size, n);
-	}
-
-	free(stats);
-
-	// Grab the heap statistics
-	mbed_stats_heap_t heap_stats;
-	mbed_stats_heap_get(&heap_stats);
-	svprintf(server, "Heap size: %lu / %lu bytes\r\n", heap_stats.current_size,
-			heap_stats.reserved_size);
-
-//	stprintf(server->getStream(), "\r\nRecent CPU usage: %.1f%%\r\n",
-//			MCULoadMeasurement::getInstance().getCPUUsage() * 100);
-	return 0;
-}
-
-static int eqmount_systime(EqMountServer *server, const char *cmd, int argn,
-		char *argv[]) {
-	char buf[32];
-	time_t t = time(NULL);
-
-#if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
-	ctime_r(&t, buf);
-#else
-	core_util_critical_section_enter();
-	char *ibuf = ctime(&t);
-	strncpy(buf, ibuf, sizeof(buf));
-	core_util_critical_section_exit();
-#endif
-
-	svprintf(server, "Current UTC time: %s\r\n", buf);
-
-	return 0;
-}
-
-static int eqmount_reboot(EqMountServer *server, const char *cmd, int argn,
-		char *argv[]) {
-	NVIC_SystemReset();
-	return 0;
-}
-
-static int eqmount_save(EqMountServer *server, const char *cmd, int argn,
-		char *argv[]) {
-	if (argn != 0) {
-		svprintf(server, "Usage: save\r\n");
-		return -1;
-	}
-	TelescopeConfiguration::saveConfig_NV();
-	return 0;
-}
-
-static void add_sys_commands() {
-	EqMountServer::addCommand(
-			ServerCommand("sys", "Print system information", eqmount_sys));
-	EqMountServer::addCommand(
-			ServerCommand("systime", "Print system time", eqmount_systime));
-	EqMountServer::addCommand(
-			ServerCommand("reboot", "Reboot the system", eqmount_reboot));
-	EqMountServer::addCommand(
-			ServerCommand("save", "Save configuration file", eqmount_save));
-}
+//static void add_sys_commands() {
+//	EqMountServer::addCommand(
+//			ServerCommand("sys", "Print system information", eqmount_sys));
+//	EqMountServer::addCommand(
+//			ServerCommand("systime", "Print system time", eqmount_systime));
+//	EqMountServer::addCommand(
+//			ServerCommand("reboot", "Reboot the system", eqmount_reboot));
+//	EqMountServer::addCommand(
+//			ServerCommand("save", "Save configuration file", eqmount_save));
+//}
 

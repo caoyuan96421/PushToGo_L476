@@ -1,10 +1,10 @@
 #include "mbed.h"
 #include <stdio.h>
+#include <TMC2130/TMC2130.h>
 #include "FastSerial.h"
 #include "Board.h"
 #include "LCD1602.h"
 #include "LED.h"
-#include "TMC2130.h"
 #include "iCLNGAbsEncoder.h"
 #include "SharedSPI.h"
 #include "Axis.h"

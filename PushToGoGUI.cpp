@@ -186,10 +186,11 @@ void PushToGo_GUI::PushToGo_MenuItem_Home::showMenu(PushToGo_GUI *gui) {
 		case MOUNT_NUDGING_TRACKING:
 			st = 'S';
 			break;
-
 		case MOUNT_TRACKING:
-		case MOUNT_TRACKING_GUIDING:
 			st = 'T';
+			break;
+		case MOUNT_TRACKING_GUIDING:
+			st = 'G';
 			break;
 		default:
 			break;
