@@ -15,10 +15,10 @@ using namespace std::chrono_literals;
 
 LCD1602::LCD1602(PinName rs, PinName rw, PinName en, PinName d[],
 		PinName brightness, bool fourwire) :
-		rs(rs), rw(rw), en(en), br(NULL), fw(fourwire), d(
+		rs(rs), rw(rw), en(en), br(NULL), fw(fourwire), d
 				{ fourwire ? NC : d[0], fourwire ? NC : d[1],
 						fourwire ? NC : d[2], fourwire ? NC : d[3], d[4], d[5],
-						d[6], d[7] }) {
+						d[6], d[7] } {
 	this->en = 0;
 	for (int i = fourwire ? 4 : 0; i < 8; i++) {
 		this->d[i].output();

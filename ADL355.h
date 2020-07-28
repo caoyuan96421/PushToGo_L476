@@ -11,6 +11,10 @@
 #include "mbed.h"
 #include "pushtogo.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 class ADL355: I2C, public Inclinometer {
 public:
 	ADL355(PinName sda, PinName scl);
