@@ -189,19 +189,19 @@ void led1_thread_entry() {
 				dir = 1;
 			}
 			led1 = val;
-			wait_ms(step);
+			ThisThread::sleep_for(step);
 			break;
 		case MOUNT_SLEWING:
 		case MOUNT_NUDGING:
 		case MOUNT_NUDGING_TRACKING:
 			led1.on();
-			wait_ms(100);
+			ThisThread::sleep_for(100);
 			led1.off();
-			wait_ms(100);
+			ThisThread::sleep_for(100);
 			break;
 		case MOUNT_STOPPED:
 			led1.off();
-			wait_ms(100);
+			ThisThread::sleep_for(100);
 			break;
 		default:
 			break;
@@ -217,10 +217,10 @@ void led2_thread_entry() {
 	serial_usb->attach(_usb_cb);
 	while(1){
 		if (led2){
-			wait_ms(200);
+			ThisThread::sleep_for(200);
 			led2=0;
 		}
-		wait_ms(10);
+		ThisThread::sleep_for(10);
 	}
 }
 

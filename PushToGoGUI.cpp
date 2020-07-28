@@ -19,7 +19,7 @@
 #define ACTION_DISPLAY_DWELL_FRAME	5
 
 static void save_config() {
-	TelescopeConfiguration::saveConfig_NV();
+	TelescopeConfiguration::saveConfig();
 }
 
 struct tm getLocalTime(time_t timestamp) {

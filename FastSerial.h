@@ -16,6 +16,9 @@
 #include "platform/PlatformMutex.h"
 #include "rtos/ThisThread.h"
 
+#include <chrono>
+using namespace std::chrono_literals;
+
 namespace mbed {
 
 #ifndef MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE
@@ -515,7 +518,7 @@ public:
 	 */
 	virtual int sync() {
 		while (!tx_empty()) {
-			rtos::ThisThread::sleep_for(1);
+			rtos::ThisThread::sleep_for(1ms);
 		}
 		return 0;
 	}

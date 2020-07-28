@@ -6,9 +6,12 @@
  */
 
 #include "LCD1602.h"
+#include "rtos/ThisThread.h"
 #include "mbed_wait_api.h"
-#include "printf.h"
 #include <stdarg.h>
+#include <chrono>
+#include "printf.h"
+using namespace std::chrono_literals;
 
 LCD1602::LCD1602(PinName rs, PinName rw, PinName en, PinName d[],
 		PinName brightness, bool fourwire) :
@@ -183,20 +186,20 @@ void LCD1602::init() {
 	rs = 0;
 	rw = 0;
 	// Powerup delay
-	wait_ms(100);
+	rtos::ThisThread::sleep_for(100ms);
 	// Init four wire
 	if (fw) {
 		send_high_nibble(0x30);
-		wait_ms(5);
+		rtos::ThisThread::sleep_for(5ms);
 		send_high_nibble(0x30);
-		wait_ms(5);
+		rtos::ThisThread::sleep_for(5ms);
 		send_high_nibble(0x20);
-		wait_ms(5);
+		rtos::ThisThread::sleep_for(5ms);
 		send_byte(0x28);
-		wait_ms(5);
+		rtos::ThisThread::sleep_for(5ms);
 	} else {
 		send_byte(0x38);
-		wait_ms(5);
+		rtos::ThisThread::sleep_for(5ms);
 	}
 	command(0x0C); // No cursor
 	command(0x06); // Increment addr after read/write, no shifting

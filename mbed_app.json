@@ -5,10 +5,13 @@
                 "target.clock_source": "USE_PLL_HSE_XTAL", 
                 "platform.stdio-baud-rate": 1024000,
                 "platform.default-serial-baud-rate": 1024000, 
-                "target.device_has_add" : ["USBDEVICE"]
-            },
-            "*": {
-                "nvstore.max_keys" : 128
+                "target.device_has_add" : ["USBDEVICE"],
+                "target.features_add": ["STORAGE"],
+                "target.components_add": ["FLASHIAP"],
+                "storage.storage_type" : "TDB_INTERNAL",
+                "storage_tdb_internal.internal_size" : "0x8000",
+                "storage_tdb_internal.internal_base_address" : "0x080F8000",
+                "mbed-trace.fea-ipv6" : 0
             }
         },
     "macros": [

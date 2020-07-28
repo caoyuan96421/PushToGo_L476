@@ -49,7 +49,7 @@ void Buttons::debounce_cb(int newstate) {
 	i = 1;
 	while (!match) {
 		// Read state after debounce time
-		wait_ms(DEBOUNCE_TIME);
+		ThisThread::sleep_for(DEBOUNCE_TIME);
 		statebuf[i] = 0;
 		for (int j = 0; j < BUTTON_NUM; j++) {
 			// Pressed is 1, unpressed is 0 (invert of the voltage level)

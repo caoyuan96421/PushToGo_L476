@@ -74,7 +74,7 @@ LED::operator int() {
 void LED::breath(float duration, float start, float end) {
 	if (!has_pwm) {
 		// Can't breath without PWM capability
-		wait(duration);
+		ThisThread::sleep_for(duration*1000);
 		return;
 	}
 	const float step = 10e-3; // 10ms update
@@ -83,7 +83,7 @@ void LED::breath(float duration, float start, float end) {
 
 	*this = start;
 	for (unsigned i = 0; i < nsteps; i++) {
-		wait_ms(step*1000);
+		ThisThread::sleep_for(step*1000);
 		*this = start + i * delta;
 	}
 	*this = end;
@@ -92,21 +92,21 @@ void LED::breath(float duration, float start, float end) {
 void LED::test() {
 // On
 	on();
-	wait(1);
+	ThisThread::sleep_for(1000);
 // Off
 	off();
-	wait(1);
+	ThisThread::sleep_for(1000);
 // Toggle
 	for (int i = 0; i < 10; i++) {
 		toggle();
-		wait(0.2);
+		ThisThread::sleep_for(200);
 	}
-	wait(1);
+	ThisThread::sleep_for(1000);
 // flash
 	flash(2, 15);
 	flash(2, 3);
 	flash(2, 20);
-	wait(2);
+	ThisThread::sleep_for(2000);
 // Breath
 	breath(2, 0, 1);
 	breath(1, 1, 0.5);

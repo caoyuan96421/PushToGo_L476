@@ -39,7 +39,7 @@ bool ADL355::getAcceleration(double &ax, double &ay, double &az) {
 	// Wait for next data to be taken
 	int timeout = 500;
 	while (!(read_reg(ADL355_STATUS) & 0x01)) {
-		wait_ms(10);
+		ThisThread::sleep_for(10);
 		if((timeout-=10) < 0){
 			abort_transfer();
 			return false;

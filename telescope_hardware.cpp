@@ -200,7 +200,7 @@ static void add_sys_commands();
 
 EquatorialMount& telescopeHardwareInit() {
 	// Read configuration from NVStore
-	TelescopeConfiguration::readConfig_NV();
+	TelescopeConfiguration::readConfig();
 
 	// Object re-initialization
 	if (ra_axis != NULL) {
@@ -318,7 +318,7 @@ osStatus telescopeServerInit() {
 //}
 
 
-//static void add_sys_commands() {
+static void add_sys_commands() {
 //	EqMountServer::addCommand(
 //			ServerCommand("sys", "Print system information", eqmount_sys));
 //	EqMountServer::addCommand(
@@ -327,5 +327,5 @@ osStatus telescopeServerInit() {
 //			ServerCommand("reboot", "Reboot the system", eqmount_reboot));
 //	EqMountServer::addCommand(
 //			ServerCommand("save", "Save configuration file", eqmount_save));
-//}
+}
 
