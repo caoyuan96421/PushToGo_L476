@@ -40,10 +40,9 @@ struct tm getLocalTime(time_t timestamp) {
 PushToGo_GUI::PushToGo_GUI(LCD1602 *lcd, EquatorialMount *eq) :
 		lcd(lcd), currentDisplayMenu(&homeMenu), thread(osPriorityBelowNormal,
 		OS_STACK_SIZE, NULL, "PushToGo_GUI"), thd_btn_poll(
-				osPriorityBelowNormal,
-				512, NULL, "button_poll"), guiRunning(false), eqMount(
-				eq), prev_idle_time(0), button_state(0), button_last_update(0), homeMenu(
-				this) {
+				osPriorityBelowNormal, 512, NULL, "button_poll"), guiRunning(
+				false), eqMount(eq), prev_idle_time(0), button_state(0), button_last_update(
+				0), homeMenu(this) {
 	MBED_ASSERT(lcd != NULL);
 	MBED_ASSERT(eq != NULL);
 	lcd->clear();
@@ -61,8 +60,8 @@ PushToGo_GUI::PushToGo_GUI(LCD1602 *lcd, EquatorialMount *eq) :
 	homeMenu.menuBack.itemTitle = "   Save & Return";
 	homeMenu.menuBack.returned = save_config;
 
-	struct _quickReturnMenu : public PushToGo_MenuItem_Base {
-		void switchTo(PushToGo_GUI *gui){
+	struct _quickReturnMenu: public PushToGo_MenuItem_Base {
+		void switchTo(PushToGo_GUI *gui) {
 			gui->currentDisplayMenu = &gui->homeMenu;
 		}
 	} *_qr = new _quickReturnMenu();
@@ -92,11 +91,8 @@ void PushToGo_GUI::stopGUI() {
 void PushToGo_GUI::_task_entry() {
 	while (true) {
 		// Poll for event
-		osEvent osevt;
-		osevt = btnEvtQueue.get(100);
-		if (osevt.status == osEventMessage) {
-			ButtonEvent evt = (ButtonEvent) osevt.value.v;
-
+		ButtonEvent evt;
+		if (btnEvtQueue.try_get_for(100ms, (void**) &evt)) {
 			if (!currentDisplayMenu->reactToButton(evt, this)) {
 				// Menu structure actions
 				switch (evt) {
@@ -204,7 +200,7 @@ void PushToGo_GUI::PushToGo_MenuItem_Home::showMenu(PushToGo_GUI *gui) {
 		lcd->print("%3d%%", usage);
 	} else {
 		dwell_sec--;
-		if (dwell_sec == 0){
+		if (dwell_sec == 0) {
 			// Show quick menu
 			gui->currentDisplayMenu = gui->quickMenu.firstChild;
 			gui->currentDisplayMenu->switchTo(gui);
@@ -247,8 +243,7 @@ bool PushToGo_GUI::PushToGo_MenuItem_Home::reactToButton(ButtonEvent evt,
 	} else if (evt == BUTTON_EVENT_RELEASE) {
 		dwell_sec = 0;
 		return true;
-	}
-	else
+	} else
 		return false;
 }
 
@@ -271,18 +266,18 @@ void PushToGo_GUI::buttonStateChanged(int oldstate, int newstate) {
 
 	if ((change & BUTTON_INC) && newstate == BUTTON_INC) {
 		// INC pressed (single key)
-		btnEvtQueue.put((void*) BUTTON_EVENT_INC, 0);
+		btnEvtQueue.try_put((void*) BUTTON_EVENT_INC);
 		thd_btn_poll.flags_set(BTN_LONGPRESS_INC); // Wake up poll thread
 	} else if ((change & BUTTON_DEC) && newstate == BUTTON_DEC) {
 		// DEC pressed (single key)
-		btnEvtQueue.put((void*) BUTTON_EVENT_DEC, 0);
+		btnEvtQueue.try_put((void*) BUTTON_EVENT_DEC);
 		thd_btn_poll.flags_set(BTN_LONGPRESS_DEC); // Wake up poll thread
 	} else if ((change & BUTTON_ENTER) && newstate == BUTTON_ENTER) {
 		// ENTER pressed (single key)
-		btnEvtQueue.put((void*) BUTTON_EVENT_ENTER, 0);
+		btnEvtQueue.try_put((void*) BUTTON_EVENT_ENTER);
 	} else if (newstate == 0) {
 		thd_btn_poll.flags_set(BTN_RELEASE); // Signal state change
-		btnEvtQueue.put((void*) BUTTON_EVENT_RELEASE, 0);
+		btnEvtQueue.try_put((void*) BUTTON_EVENT_RELEASE);
 	} else {
 		thd_btn_poll.flags_set(BTN_STATE_CHANGED); // Signal state change
 	}
@@ -295,8 +290,9 @@ void PushToGo_GUI::_poll_entry() {
 		BTN_LONGPRESS_INC | BTN_LONGPRESS_DEC); // Suspend and wait for wakeup
 
 		ThisThread::flags_clear(BTN_STATE_CHANGED | BTN_RELEASE);
-		if ((ThisThread::flags_wait_any_for(BTN_STATE_CHANGED | BTN_RELEASE,
-				600) & (BTN_STATE_CHANGED | BTN_RELEASE)) != 0) {
+		if ((ThisThread::flags_wait_any_for(
+		BTN_STATE_CHANGED | BTN_RELEASE, 600ms)
+				& (BTN_STATE_CHANGED | BTN_RELEASE)) != 0) {
 			// Button has changed during initial wait, give up
 			continue;
 		}
@@ -306,7 +302,7 @@ void PushToGo_GUI::_poll_entry() {
 		}
 
 		int cnt = 0;
-		int timeout = 200; // Initial timeout
+		chrono::milliseconds timeout = 200ms; // Initial timeout
 
 		do {
 			if ((ThisThread::flags_wait_any_for(BTN_STATE_CHANGED | BTN_RELEASE,
@@ -329,7 +325,7 @@ void PushToGo_GUI::_poll_entry() {
 				evt = (ButtonEvent) ((uint32_t) evt | BUTTON_EVENT_FAST);
 			}
 
-			btnEvtQueue.put((void*) evt, 0);
+			btnEvtQueue.try_put((void*) evt);
 		} while (true);
 	}
 }
@@ -894,34 +890,32 @@ void PushToGo_GUI::PushToGo_MenuItem_Edit_FixedPoint::setValue(double val) {
 bool PushToGo_GUI::PushToGo_MenuItem_Action_WithConfirm::reactToButton(
 		ButtonEvent evt, PushToGo_GUI *gui) {
 	if (evt == BUTTON_EVENT_ENTER) {
-		if (!triggered){
+		if (!triggered) {
 			triggered = true;
 			yesno = false;
-		}
-		else{
+		} else {
 			if (yesno) {
 				ret = action(gui);
 				dwell = ACTION_DISPLAY_DWELL_FRAME;
-			}
-			else {
+			} else {
 				dwell = 0;
 			}
 			triggered = false;
 		}
 		return true;
-	} else if ((evt == BUTTON_EVENT_INC || evt == BUTTON_EVENT_DEC) && triggered) {
+	} else if ((evt == BUTTON_EVENT_INC || evt == BUTTON_EVENT_DEC)
+			&& triggered) {
 		// Toggle yes/no
 		yesno = !yesno;
 		return true;
-	}
-	else{
+	} else {
 		return false;
 	}
 }
 
 void PushToGo_GUI::PushToGo_MenuItem_Action_WithConfirm::showMenu(
 		PushToGo_GUI *gui) {
-	if (triggered){
+	if (triggered) {
 		gui->lcd->setPosition(0, 0);
 		gui->lcd->print("Confirm?        ");
 
@@ -930,8 +924,7 @@ void PushToGo_GUI::PushToGo_MenuItem_Action_WithConfirm::showMenu(
 			gui->lcd->print("             YES");
 		else
 			gui->lcd->print("              NO");
-	}
-	else{
+	} else {
 		PushToGo_MenuItem_Action::showMenu(gui);
 	}
 }

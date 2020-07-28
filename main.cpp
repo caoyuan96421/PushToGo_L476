@@ -189,19 +189,19 @@ void led1_thread_entry() {
 				dir = 1;
 			}
 			led1 = val;
-			ThisThread::sleep_for(step);
+			ThisThread::sleep_for(chrono::milliseconds(step));
 			break;
 		case MOUNT_SLEWING:
 		case MOUNT_NUDGING:
 		case MOUNT_NUDGING_TRACKING:
 			led1.on();
-			ThisThread::sleep_for(100);
+			ThisThread::sleep_for(100ms);
 			led1.off();
-			ThisThread::sleep_for(100);
+			ThisThread::sleep_for(100ms);
 			break;
 		case MOUNT_STOPPED:
 			led1.off();
-			ThisThread::sleep_for(100);
+			ThisThread::sleep_for(100ms);
 			break;
 		default:
 			break;
@@ -217,10 +217,10 @@ void led2_thread_entry() {
 	serial_usb->attach(_usb_cb);
 	while(1){
 		if (led2){
-			ThisThread::sleep_for(200);
+			ThisThread::sleep_for(200ms);
 			led2=0;
 		}
-		ThisThread::sleep_for(10);
+		ThisThread::sleep_for(10ms);
 	}
 }
 
@@ -247,7 +247,7 @@ int main() {
 	while (1) {
 //		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
-		ThisThread::sleep_for(100);
+		ThisThread::sleep_for(100ms);
 //		double x, y, z;
 //		accel.getAcceleration(x, y, z);
 //		accel.getTilt(x,y);

@@ -1,5 +1,5 @@
 /**
-#include <TMC2130/TMC2130.h>
+ #include <TMC2130/TMC2130.h>
  * Harware setup is implemented in this file
  */
 
@@ -16,6 +16,8 @@
 #include "Axis.h"
 #include "ADL355.h"
 #include "TMC2130.h"
+#include "KVStore.h"
+#include "KVMap.h"
 
 // Motor SPI
 SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
@@ -276,7 +278,7 @@ osStatus telescopeServerInit() {
 	if (!serverInitialized) {
 		// Only run once
 		serverInitialized = true;
-//		add_sys_commands();
+		add_sys_commands();
 	} else {
 		return osErrorResource;
 	}
@@ -297,30 +299,37 @@ osStatus telescopeServerInit() {
 	return osOK;
 }
 
+static int eqmount_kv(EqMountServer *server, const char *cmd, int argn,
+		char *argv[]) {
+	char key[32], value[256];
 
-//static int eqmount_systime(EqMountServer *server, const char *cmd, int argn,
-//		char *argv[]) {
-//	char buf[32];
-//	time_t t = time(NULL);
-//
-//#if !( defined(__ARMCC_VERSION) || defined(__CC_ARM) )
-//	ctime_r(&t, buf);
-//#else
-//	core_util_critical_section_enter();
-//	char *ibuf = ctime(&t);
-//	strncpy(buf, ibuf, sizeof(buf));
-//	core_util_critical_section_exit();
-//#endif
-//
-//	svprintf(server, "Current UTC time: %s\r\n", buf);
-//
-//	return 0;
-//}
+	KVMap &kv_map = KVMap::get_instance();
+	KVStore *kv = kv_map.get_main_kv_instance("/kv/");
+	if (!kv) {
+		error("Error: cannot find /kv/");
+	}
 
+	if (kv->init() != MBED_SUCCESS)
+		return false;
+	KVStore::iterator_t it;
+	if (kv->iterator_open(&it, NULL) != MBED_SUCCESS)
+		return false;
+	// Iterate over all saved items
+	while (kv->iterator_next(it, key, sizeof(key)) == MBED_SUCCESS) {
+		unsigned int actual_size;
+		if (kv->get(key, value, sizeof(value), &actual_size, 0) != MBED_SUCCESS) {
+			break;
+		}
+		svprintf(server, "[%-20s]\t=\t%s\r\n", key, value);
+	}
+	kv->iterator_close(it);
+
+	return 0;
+}
 
 static void add_sys_commands() {
-//	EqMountServer::addCommand(
-//			ServerCommand("sys", "Print system information", eqmount_sys));
+	EqMountServer::addCommand(
+			ServerCommand("kv", "Print key-value pairs", eqmount_kv));
 //	EqMountServer::addCommand(
 //			ServerCommand("systime", "Print system time", eqmount_systime));
 //	EqMountServer::addCommand(
