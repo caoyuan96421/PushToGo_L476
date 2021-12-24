@@ -23,7 +23,7 @@
 
 // Configuration parameters
 #define CLOCK_SOURCE                                                      USE_PLL_HSE_XTAL                                 // set by application[NUCLEO_L476RG]
-#define LPTICKER_DELAY_TICKS                                              0                                                // set by target:NUCLEO_L476RG
+#define LPTICKER_DELAY_TICKS                                              0                                                // set by target:MCU_STM32L4
 #define MBED_CONF_DRIVERS_QSPI_CSN                                        QSPI_FLASH1_CSN                                  // set by library:drivers
 #define MBED_CONF_DRIVERS_QSPI_IO0                                        QSPI_FLASH1_IO0                                  // set by library:drivers
 #define MBED_CONF_DRIVERS_QSPI_IO1                                        QSPI_FLASH1_IO1                                  // set by library:drivers
@@ -174,7 +174,7 @@
 #define MBED_CONF_TARGET_DEEP_SLEEP_LATENCY                               4                                                // set by target:MCU_STM32
 #define MBED_CONF_TARGET_DEFAULT_ADC_VREF                                 NAN                                              // set by target:Target
 #define MBED_CONF_TARGET_INIT_US_TICKER_AT_BOOT                           1                                                // set by target:MCU_STM32
-#define MBED_CONF_TARGET_LPTICKER_LPTIM                                   1                                                // set by target:NUCLEO_L476RG
+#define MBED_CONF_TARGET_LPTICKER_LPTIM                                   1                                                // set by target:MCU_STM32L4
 #define MBED_CONF_TARGET_LPTICKER_LPTIM_CLOCK                             1                                                // set by target:MCU_STM32
 #define MBED_CONF_TARGET_LPUART_CLOCK_SOURCE                              USE_LPUART_CLK_LSE|USE_LPUART_CLK_PCLK1          // set by target:MCU_STM32
 #define MBED_CONF_TARGET_LSE_AVAILABLE                                    1                                                // set by target:MCU_STM32
@@ -199,7 +199,6 @@
 #define MEM_FREE                                                          free                                             // set by library:mbed-trace
 // Macros
 #define MBEDTLS_CIPHER_MODE_CTR                                                                                            // defined by library:SecureStore
-#define MBEDTLS_CMAC_C                                                                                                     // defined by library:SecureStore
 #define MBED_CPU_STATS_ENABLED                                                                                             // defined by application
 #define MBED_HEAP_STATS_ENABLED                                           1                                                // defined by application
 #define MBED_MEM_TRACING_ENABLED                                          0                                                // defined by application
