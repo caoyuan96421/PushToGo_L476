@@ -121,6 +121,7 @@ extern "C" {
 			int row = 0;
 			char *p = buffer;
 			int ss = size;
+			lcd.setBrightness(0.5);
 			while (ss > 0) {
 				lcd.setPosition(row, 0);
 				lcd.write(p, ss < 16 ? ss : 16);
