@@ -10,7 +10,7 @@
 
 #include "DigitalOut.h"
 #include "DigitalInOut.h"
-#include "PWMOut.h"
+#include "PwmOut.h"
 
 using namespace mbed;
 
