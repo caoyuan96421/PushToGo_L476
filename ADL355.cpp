@@ -6,6 +6,7 @@
  */
 
 #include "ADL355.h"
+#include "Logger.h"
 
 #define ADL355_ADDR	0x1D
 #define ADL355_FULLSCALE	2.0 // Full scale acceleration, +-2g for 20-bit
@@ -42,6 +43,7 @@ bool ADL355::getAcceleration(double &ax, double &ay, double &az) {
 		ThisThread::sleep_for(10);
 		if((timeout-=10) < 0){
 			abort_transfer();
+			Logger::logError("ADL355 Accelerometor not connected.");
 			return false;
 		}
 	}
@@ -67,6 +69,8 @@ bool ADL355::getAcceleration(double &ax, double &ay, double &az) {
 	ax = (double) dx / (1 << 19) * ADL355_FULLSCALE;
 	ay = (double) dy / (1 << 19) * ADL355_FULLSCALE;
 	az = (double) dz / (1 << 19) * ADL355_FULLSCALE;
+
+	Logger::log("ADL355 ax=%.5f, ay=%.5f, az=%.5f", ax, ay, az);
 
 	return true;
 }

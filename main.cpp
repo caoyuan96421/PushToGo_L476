@@ -13,11 +13,14 @@
 #include "Buttons.h"
 #include "ADL355.h"
 #include "printf.h"
-#include "USBSerial.h"
+#include "USB.h"
+#include "mbed_mem_trace.h"
+#include "Logger.h"
+#include "SDBlockDevice.h"
+#include "mbed_crash_data_offsets.h"
 
 //FastSerial<UART_3> uart3(PC_10, PC_11, 115200);
 //FastSerial<UART_5> uart5(PC_12, PD_2, 115200);
-FastSerial<UART_2> pc(USBTX, USBRX, 1024000);
 PinName lcdpins[] = { NC, NC, NC, NC, LCD_D4, LCD_D5, LCD_D6, LCD_D7 };
 LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
 //ADL355 accel(PB_14, PB_13);
@@ -39,16 +42,7 @@ LCD1602 lcd(LCD_RS, LCD_RW, LCD_EN, lcdpins, LCD_BRIGHTNESS);
 //	rd_thd.flags_set(0x7FFFFFFF);
 //}
 
-void pcprintf(const char *fmt, ...) {
-	char buf[1024];
-	va_list args;
-	va_start(args, fmt);
-	int len = vsnprintf(buf, sizeof(buf), fmt, args);
-	va_end(args);
 
-	if (len > 0)
-		pc.write(buf, len);
-}
 
 //void reader(){
 //	char ret[100];
@@ -74,9 +68,7 @@ void pcprintf(const char *fmt, ...) {
 
 // Override the default fatal error handlers
 extern "C" void mbed_die(void) {
-#if !defined (NRF51_H) && !defined(TARGET_EFM32)
 	core_util_critical_section_enter();
-#endif
 	gpio_t led_err;
 	gpio_init_out(&led_err, LED3);
 
@@ -97,70 +89,72 @@ extern "C" void mbed_die(void) {
 	}
 }
 
-extern "C" void error(const char *format, ...) {
-	static char buffer[257];
-	core_util_critical_section_enter();
-#ifndef NDEBUG
-	va_list arg;
-	va_start(arg, format);
-	int size = vsnprintf(buffer, sizeof(buffer) - 1, format, arg);
-	if (size >= (int) sizeof(buffer)) {
-		// Properly terminate the string
-		buffer[sizeof(buffer) - 1] = '\0';
-	}
-	va_end(arg);
-
-
-	gpio_t led_err;
-	gpio_init_out(&led_err, LED3);
-
-	while(1){
-		for (int i = 0; i < 5; ++i) {
-			gpio_write(&led_err, 1);
-			wait_us(150000);
-			gpio_write(&led_err, 0);
-			wait_us(150000);
+extern "C" {
+	void error(const char *format, ...) {
+		static char buffer[257];
+		core_util_critical_section_enter();
+	#ifndef NDEBUG
+		va_list arg;
+		va_start(arg, format);
+		size_t size = vsnprintf(buffer, sizeof(buffer), format, arg);
+		size += snprintf(buffer+size, sizeof(buffer)-size, " @ PC=0x%08x, LR=0x%08x", MBED_CRASH_DATA.fault.context.PC_reg, MBED_CRASH_DATA.fault.context.LR_reg);
+		if (size >= sizeof(buffer)) {
+			// Properly terminate the string
+			buffer[sizeof(buffer) - 1] = '\0';
 		}
+		va_end(arg);
 
-		lcd.clear();
-		// Print multi-row message
-		int row = 0;
-		char *p = buffer;
-		int ss = size;
-		while (ss > 0) {
-			lcd.setPosition(row, 0);
-			lcd.write(p, ss < 16 ? ss : 16);
-			p += 16;
-			ss -= 16;
-			row++;
-			if (row == 2 && ss > 0) {
-				// Scroll
-				wait_us(1000000);
-				lcd.clear();
-				lcd.setPosition(0, 0);
-				lcd.write(p - 16, 16);
-				row = 1;
+
+		gpio_t led_err;
+		gpio_init_out(&led_err, LED3);
+
+		while(1){
+			for (int i = 0; i < 5; ++i) {
+				gpio_write(&led_err, 1);
+				wait_us(150000);
+				gpio_write(&led_err, 0);
+				wait_us(150000);
+			}
+
+			lcd.clear();
+			// Print multi-row message
+			int row = 0;
+			char *p = buffer;
+			int ss = size;
+			while (ss > 0) {
+				lcd.setPosition(row, 0);
+				lcd.write(p, ss < 16 ? ss : 16);
+				p += 16;
+				ss -= 16;
+				row++;
+				if (row == 2 && ss > 0) {
+					// Scroll
+					wait_us(1000000);
+					lcd.clear();
+					lcd.setPosition(0, 0);
+					lcd.write(p - 16, 16);
+					row = 1;
+				}
 			}
 		}
+	#endif
+
+	//	mbed_die();
+
+		core_util_critical_section_exit(); // Will not reach here
 	}
-#endif
 
-//	mbed_die();
-
-	core_util_critical_section_exit(); // Will not reach here
-}
-
-extern "C" MBED_NORETURN mbed_error_status_t mbed_error(
-		mbed_error_status_t error_status, const char *error_msg,
-		unsigned int error_value, const char *filename, int line_number) {
-	error("Error: 0x%x, %s", error_status, error_msg);
+	MBED_NORETURN mbed_error_status_t mbed_error(
+			mbed_error_status_t error_status, const char *error_msg,
+			unsigned int error_value, const char *filename, int line_number) {
+		error("Error: 0x%x, %s", error_status, error_msg);
+	}
 }
 
 
 EquatorialMount *eqMount;
-extern USBSerial *serial_usb;
-Thread led1_thread(osPriorityBelowNormal, 512, NULL, "LED1 thread");
-Thread led2_thread(osPriorityBelowNormal, 512, NULL, "LED2 thread");
+Thread led1_thread(osPriorityAboveNormal, 1024, NULL, "LED1 thread");
+Thread led2_thread(osPriorityAboveNormal, 1024, NULL, "LED2 thread");
 
 
 LED led1(LED1);
@@ -214,7 +208,6 @@ void _usb_cb(){
 }
 
 void led2_thread_entry() {
-	serial_usb->attach(_usb_cb);
 	while(1){
 		if (led2){
 			ThisThread::sleep_for(200ms);
@@ -224,11 +217,16 @@ void led2_thread_entry() {
 	}
 }
 
-#include "mbed_mem_trace.h"
+SDBlockDevice sd_bd(SD_MOSI, SD_MISO, SD_SCK, SD_CS, 20000000);
 
 int main() {
 //	NVStore::get_instance().reset();
     mbed_mem_trace_set_callback(mbed_mem_trace_default_callback);
+	TelescopeConfiguration::readConfig();
+
+    Logger::init(&sd_bd);
+    Logger::log("");
+    Logger::log("PTG initializing...");
 
 	eqMount = &telescopeHardwareInit();
 	telescopeServerInit();
@@ -237,17 +235,34 @@ int main() {
 	gui->listenTo(&buttons);
 	gui->startGUI();
 
+    Logger::log("LCD GUI started.");
 
 	// Start LED1 thread
 	led1_thread.start(led1_thread_entry);
-	// Start LED2 thread
 	led2_thread.start(led2_thread_entry);
 
+
+    auto start = HighResClock::now();
+    Logger::log("PTG started.");
+    chrono::duration<int, micro> interval = HighResClock::now() - start;
+
+
+    Logger::log("Time to log: %d us", interval.count());
 
 	while (1) {
 //		uart3.write("abcdefghijklmnopqrstuvwxyz123456", 32);
 //		uart3.write(s, sizeof(s));
-		ThisThread::sleep_for(100ms);
+
+//		ThisThread::sleep_for(30s);
+//		usbMSDStop();
+//		usbServerInit(eqMount);
+
+
+		ThisThread::sleep_for(2ms);
+
+		eqMount->getRA().getAngleDeg();
+
+//		xprintf("test");
 //		double x, y, z;
 //		accel.getAcceleration(x, y, z);
 //		accel.getTilt(x,y);

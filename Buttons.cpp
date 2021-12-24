@@ -10,7 +10,7 @@
 
 Buttons::Buttons() :
 		listener(NULL), evt_queue(4 * EVENTS_EVENT_SIZE), thread(
-				osPriorityAboveNormal, 1024, NULL, "btns_evt_q"), previous_state(
+				osPriorityHigh, 1024, NULL, "btns_evt_q"), previous_state(
 				0) {
 	for (int i = 0; i < BUTTON_NUM; i++) {
 		buttons[i] = new InterruptIn(Button_All[i], PullUp);
@@ -49,7 +49,7 @@ void Buttons::debounce_cb(int newstate) {
 	i = 1;
 	while (!match) {
 		// Read state after debounce time
-		ThisThread::sleep_for(DEBOUNCE_TIME);
+		ThisThread::sleep_for(chrono::milliseconds(DEBOUNCE_TIME));
 		statebuf[i] = 0;
 		for (int j = 0; j < BUTTON_NUM; j++) {
 			// Pressed is 1, unpressed is 0 (invert of the voltage level)

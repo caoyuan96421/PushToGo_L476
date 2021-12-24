@@ -38,9 +38,9 @@ struct tm getLocalTime(time_t timestamp) {
 }
 
 PushToGo_GUI::PushToGo_GUI(LCD1602 *lcd, EquatorialMount *eq) :
-		lcd(lcd), currentDisplayMenu(&homeMenu), thread(osPriorityBelowNormal,
+		lcd(lcd), currentDisplayMenu(&homeMenu), thread(osPriorityAboveNormal,
 		OS_STACK_SIZE, NULL, "PushToGo_GUI"), thd_btn_poll(
-				osPriorityBelowNormal, 512, NULL, "button_poll"), guiRunning(
+				osPriorityHigh, 1024, NULL, "button_poll"), guiRunning(
 				false), eqMount(eq), prev_idle_time(0), button_state(0), button_last_update(
 				0), homeMenu(this) {
 	MBED_ASSERT(lcd != NULL);

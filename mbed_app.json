@@ -7,15 +7,15 @@
                 "platform.default-serial-baud-rate": 1024000, 
                 "target.device_has_add" : ["USBDEVICE"],
                 "target.features_add": ["STORAGE"],
-                "target.components_add": ["FLASHIAP"],
+                "target.components_add": ["FLASHIAP", "SD"],
                 "storage.storage_type" : "TDB_INTERNAL",
                 "storage_tdb_internal.internal_size" : "0x8000",
                 "storage_tdb_internal.internal_base_address" : "0x080F8000",
-                "mbed-trace.fea-ipv6" : 0
+                "mbed-trace.fea-ipv6" : 0, 
+                "fat_chan.ff_fs_exfat" : 1
             }
         },
     "macros": [
-        "DEVICE_SPI_COUNT=3",
         "MBED_CPU_STATS_ENABLED",
         "OS_ISR_FIFO_QUEUE=64",
         "MBED_MEM_TRACING_ENABLED=0",

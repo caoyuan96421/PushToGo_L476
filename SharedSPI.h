@@ -77,6 +77,7 @@ protected:
 	size_t num_ifcs;
 	SPI_Interface *ifcs[SHAREDSPI_MAX_INSTANCE];
 	PlatformMutex mutex;
+	PinName _mosi, _miso, _sclk;
 
 	void assertCS(DigitalOut &cs);
 	void deassertCS(DigitalOut &cs);

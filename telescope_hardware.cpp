@@ -18,6 +18,8 @@
 #include "TMC2130.h"
 #include "KVStore.h"
 #include "KVMap.h"
+#include "USB.h"
+#include "Logger.h"
 
 // Motor SPI
 SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
@@ -25,63 +27,6 @@ SharedSPI spi1(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, 8, 3, 1000000);
 // Encoder SPI
 // Pullup on MISO
 SharedSPI spi2(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, 8, 3, 4000000, true);
-
-//class DummyStepper: public StepperMotor {
-//public:
-//	DummyStepper() {
-//		state = IDLE;
-//		dir = STEP_FORWARD;
-//		freq = 0;
-//		stepCount = 0;
-//		tim.start();
-//	}
-//	virtual ~DummyStepper() {
-//	}
-//	virtual void start(stepdir_t dir) {
-//		if (state == IDLE) {
-//			this->dir = dir;
-//			tim.reset();
-//			state = RUNNING;
-//		}
-//	}
-//	virtual void stop() {
-//		if (state == RUNNING) {
-//			stepCount += freq * tim.read_high_resolution_us() / 1E6
-//					* (dir == STEP_BACKWARD ? -1 : 1);
-//			state = IDLE;
-//		}
-//	}
-//	virtual double setFrequency(double freq) {
-//		if (state == RUNNING) {
-//			stop();
-//			start(dir);
-//		}
-//		this->freq = freq;
-//		return freq;
-//	}
-//	virtual double getFrequency() {
-//		return freq;
-//	}
-//	virtual void setStepCount(double sc) {
-//		stepCount = sc;
-//	}
-//	virtual double getStepCount() {
-//		if (state == RUNNING)
-//			return stepCount
-//					+ freq * tim.read_high_resolution_us() / 1E6
-//							* (dir == STEP_BACKWARD ? -1 : 1);
-//		else
-//			return stepCount;
-//	}
-//private:
-//	enum {
-//		IDLE, RUNNING
-//	} state;
-//	double freq;
-//	double stepCount;
-//	stepdir_t dir;
-//	Timer tim;
-//};
 
 // Steppers
 StepperMotor *ra_stepper;
@@ -177,17 +122,78 @@ public:
 		((TMC2130*) stepper)->setStealthChop(true);
 		stepper->setCurrent(0.3);
 		stepper->setMicroStep(256);
+		Logger::log("%s IDLE Current=%.1f, Microstep=%d", axisName, 0.3, 256);
 	}
 	virtual void slew_mode() {
 		((TMC2130*) stepper)->setStealthChop(false);
 		stepper->setCurrent(0.7);
 		stepper->setMicroStep(32);
+		Logger::log("%s SLEW Current=%.1f, Microstep=%d", axisName, 0.7, 32);
 	}
 	virtual void track_mode() {
 		((TMC2130*) stepper)->setStealthChop(true);
 		stepper->setCurrent(0.3);
 		stepper->setMicroStep(256);
+		Logger::log("%s TRACK Current=%.1f, Microstep=%d", axisName, 0.3, 256);
 	}
+};
+
+
+class DummyStepper: public StepperMotor {
+public:
+	DummyStepper() {
+		state = IDLE;
+		dir = STEP_FORWARD;
+		freq = 0;
+		stepCount = 0;
+		tim.start();
+	}
+	virtual ~DummyStepper() {
+	}
+	virtual void start(stepdir_t dir) {
+		if (state == IDLE) {
+			this->dir = dir;
+			tim.reset();
+			state = RUNNING;
+		}
+	}
+	virtual void stop() {
+		if (state == RUNNING) {
+			stepCount += freq * tim.read_high_resolution_us() / 1E6
+					* (dir == STEP_BACKWARD ? -1 : 1);
+			state = IDLE;
+		}
+	}
+	virtual double setFrequency(double freq) {
+		if (state == RUNNING) {
+			stop();
+			start(dir);
+		}
+		this->freq = freq;
+		return freq;
+	}
+	virtual double getFrequency() {
+		return freq;
+	}
+	virtual void setStepCount(double sc) {
+		stepCount = sc;
+	}
+	virtual double getStepCount() {
+		if (state == RUNNING)
+			return stepCount
+					+ freq * tim.read_high_resolution_us() / 1E6
+							* (dir == STEP_BACKWARD ? -1 : 1);
+		else
+			return stepCount;
+	}
+private:
+	enum {
+		IDLE, RUNNING
+	} state;
+	double freq;
+	double stepCount;
+	stepdir_t dir;
+	Timer tim;
 };
 
 Axis *ra_axis = NULL;
@@ -196,13 +202,11 @@ Axis *dec_axis = NULL; // Dummy
 EquatorialMount *eq_mount = NULL;
 
 // Accelerameter
-ADL355 accel(PB_14, PB_13);
+ADL355 *accel;
 
 static void add_sys_commands();
 
 EquatorialMount& telescopeHardwareInit() {
-	// Read configuration from NVStore
-	TelescopeConfiguration::readConfig();
 
 	// Object re-initialization
 	if (ra_axis != NULL) {
@@ -231,6 +235,20 @@ EquatorialMount& telescopeHardwareInit() {
 			* TelescopeConfiguration::getDouble("gear_reduction")
 			* TelescopeConfiguration::getDouble("worm_teeth") / 360.0;
 
+//	SPI *motor_spi1 = new SPI(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, MOTOR1_CS, use_gpio_ssel);
+//	SPI *motor_spi2 = new SPI(MOTOR_MOSI, MOTOR_MISO, MOTOR_SCK, MOTOR2_CS, use_gpio_ssel);
+//	motor_spi1->format(8, 3);
+//	motor_spi1->frequency(1000000);
+//	motor_spi2->format(8, 3);
+//	motor_spi2->frequency(1000000);
+//
+//	SPI *enc_spi1 = new SPI(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, ENCODER1_CS, use_gpio_ssel);
+//	SPI *enc_spi2 = new SPI(ENCODER_MOSI, ENCODER_MISO, ENCODER_SCK, ENCODER2_CS, use_gpio_ssel);
+//	enc_spi1->format(8, 3);
+//	enc_spi1->frequency(4000000);
+//	enc_spi2->format(8, 3);
+//	enc_spi2->frequency(4000000);
+
 	ra_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER1_CS));
 	dec_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER2_CS));
 
@@ -241,6 +259,7 @@ EquatorialMount& telescopeHardwareInit() {
 	ra_stepper = new TMC2130(*spi1.getInterface(MOTOR1_CS), MOTOR1_STEP,
 	MOTOR1_DIR, MOTOR1_DIAG,
 	MOTOR1_IREF, TelescopeConfiguration::getBool("ra_invert"));
+//	ra_stepper = new DummyStepper();
 
 	dec_stepper = new TMC2130(*spi1.getInterface(MOTOR2_CS), MOTOR2_STEP,
 	MOTOR2_DIR, MOTOR2_DIAG,
@@ -255,7 +274,8 @@ EquatorialMount& telescopeHardwareInit() {
 	eq_mount = new EquatorialMount(*ra_axis, *dec_axis, clk, location);
 
 	// Set accelerator if available
-	eq_mount->setInclinometer(&accel);
+	accel = new ADL355(ACCEL_SDA, ACCEL_SCL);
+	eq_mount->setInclinometer(accel);
 	eq_mount->getInclinometer()->refresh();
 
 	return (*eq_mount); // Return reference to eq_mount
@@ -265,10 +285,6 @@ EquatorialMount& telescopeHardwareInit() {
 typedef FastSerial<UART_3> HC_Serial;
 HC_Serial *serial_hc = NULL;
 EqMountServer *server_hc = NULL;
-
-/* USB connection from PC*/
-USBSerial *serial_usb = new USBSerial(false);
-EqMountServer *server_usb = NULL;
 
 bool serverInitialized = false;
 
@@ -290,11 +306,9 @@ osStatus telescopeServerInit() {
 	}
 	server_hc->bind(*eq_mount);
 
-	if (!server_usb) {
-		serial_usb->connect();
-		server_usb = new EqMountServer(*serial_usb, false);
-	}
-	server_usb->bind(*eq_mount);
+    Logger::log("Serial server started.");
+
+	usbServerInit(eq_mount);
 
 	return osOK;
 }

@@ -2,8 +2,10 @@
 #include "LED.h"
 #include "TelescopeConfiguration.h"
 #include "ADL355.h"
+#include "USB.h"
+#include "Logger.h"
 
-extern ADL355 accel;
+extern ADL355 *accel;
 //clearCalibration();
 
 void PushToGo_GUI::addConfigMenu(PushToGo_MenuItem *configuration) {
@@ -119,6 +121,58 @@ void PushToGo_GUI::addConfigMenu(PushToGo_MenuItem *configuration) {
 	}
 }
 
+struct usbItem: public PushToGo_GUI::PushToGo_MenuItem_Base {
+	usbItem() {
+		itemTitle = "Mount USB Drive";
+		usbMounted = false;
+		failed = false;
+	}
+	void setMSD(bool msd) {
+		if (msd) {
+			usbServerDeinit();
+			if (!usbMSDStart()) {
+				failed = true;
+			} else {
+				failed = false;
+			}
+		} else {
+			usbMSDStop();
+			usbServerInit(this->getGUI()->eqMount);
+			failed = false;
+		}
+	}
+	bool reactToButton(PushToGo_GUI::ButtonEvent evt, PushToGo_GUI *gui) {
+		if (usbMounted) {
+			if (evt == PushToGo_GUI::ButtonEvent::BUTTON_EVENT_ENTER) {
+				usbMounted = false;
+				setMSD(false);
+				itemTitle = "Mount USB Drive";
+			}
+			return true; // Ignore other buttons
+		} else {
+			if (evt == PushToGo_GUI::ButtonEvent::BUTTON_EVENT_ENTER) {
+				usbMounted = true;
+				setMSD(true);
+				itemTitle = "Unmount USB Drive";
+				return true;
+			} else {
+				return false;
+			}
+		}
+	}
+	void showMenu(PushToGo_GUI *gui) {
+		PushToGo_MenuItem_Base::showMenu(gui);
+		gui->lcd->setPosition(1, 0);
+		if (failed) {
+			gui->lcd->print("     FAILED     ");
+		} else {
+			gui->lcd->print("                ");
+		}
+	}
+	bool usbMounted;
+	bool failed;
+};
+
 void PushToGo_GUI::addUtilitiesMenu(PushToGo_MenuItem *utilities) {
 
 	/***************Utilities Menu********************/
@@ -156,6 +210,22 @@ void PushToGo_GUI::addUtilitiesMenu(PushToGo_MenuItem *utilities) {
 	} *linkIndex = new linkItem();
 
 	utilities->add(linkIndex);
+
+	usbItem *usbMount = new usbItem();
+
+	utilities->add(usbMount);
+
+	struct formatItem: public PushToGo_MenuItem_Action_WithConfirm {
+		formatItem() {
+			itemTitle = "Format SD card";
+		}
+		bool action(PushToGo_GUI *gui) {
+			Logger::format();
+			return true;
+		}
+	} *format = new formatItem();
+
+	utilities->add(format);
 }
 
 void PushToGo_GUI::addCalibrationMenu(PushToGo_MenuItem *calibration) {
@@ -404,25 +474,32 @@ void PushToGo_GUI::addDebugMenu(PushToGo_MenuItem *dbg) {
 
 // Debug menu
 
-	struct dbgItem1: public PushToGo_MenuItem_Display {
-		dbgItem1() :
-				PushToGo_MenuItem_Display("RA Encoder Raw") {
-		}
-		void display(PushToGo_GUI *gui) {
-			gui->lcd->print("%16d",
-					gui->eqMount->getRA().getEncoder()->readPos());
-		}
-	} *itm1 = new dbgItem1();
+	if (dbg->getGUI()->eqMount->getRA().getEncoder()) {
+		struct dbgItem1: public PushToGo_MenuItem_Display {
+			dbgItem1() :
+					PushToGo_MenuItem_Display("RA Encoder Raw") {
+			}
+			void display(PushToGo_GUI *gui) {
+				gui->lcd->print("%16d",
+						gui->eqMount->getRA().getEncoder()->readPos());
+			}
+		} *itm1 = new dbgItem1();
 
-	struct dbgItem2: public PushToGo_MenuItem_Display {
-		dbgItem2() :
-				PushToGo_MenuItem_Display("DEC Encoder Raw") {
-		}
-		void display(PushToGo_GUI *gui) {
-			gui->lcd->print("%16d",
-					gui->eqMount->getDEC().getEncoder()->readPos());
-		}
-	} *itm2 = new dbgItem2();
+		dbg->add(itm1);
+	}
+
+	if (dbg->getGUI()->eqMount->getDEC().getEncoder()) {
+		struct dbgItem2: public PushToGo_MenuItem_Display {
+			dbgItem2() :
+					PushToGo_MenuItem_Display("DEC Encoder Raw") {
+			}
+			void display(PushToGo_GUI *gui) {
+				gui->lcd->print("%16d",
+						gui->eqMount->getDEC().getEncoder()->readPos());
+			}
+		} *itm2 = new dbgItem2();
+		dbg->add(itm2);
+	}
 
 	struct dbgItem3: public PushToGo_MenuItem_Display {
 		dbgItem3(char axis = 'X') :
@@ -435,7 +512,7 @@ void PushToGo_GUI::addDebugMenu(PushToGo_MenuItem *dbg) {
 		}
 		void display(PushToGo_GUI *gui) {
 			double x, y, z;
-			if (!accel.getAcceleration(x, y, z)) {
+			if (!accel->getAcceleration(x, y, z)) {
 				gui->lcd->print("  DISCONNECTED  ");
 				return;
 			}
@@ -470,8 +547,6 @@ void PushToGo_GUI::addDebugMenu(PushToGo_MenuItem *dbg) {
 			new dbgItem3('Z'), *itm6 = new dbgItem3(0xF2), *itm7 = new dbgItem3(
 			't'), *itm8 = new dbgItem3('g');
 
-	dbg->add(itm1);
-	dbg->add(itm2);
 	dbg->add(itm3);
 	dbg->add(itm4);
 	dbg->add(itm5);
@@ -571,6 +646,10 @@ void PushToGo_GUI::addQuickMenu(PushToGo_MenuItem *root) {
 		}
 	} *gotoIndex = new gotoIndexItem();
 	root->getGUI()->quickMenu.add(gotoIndex);
+
+	usbItem *usbMount = new usbItem();
+
+	root->getGUI()->quickMenu.add(usbMount);
 }
 
 void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {

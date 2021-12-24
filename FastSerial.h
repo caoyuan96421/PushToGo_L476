@@ -220,8 +220,8 @@ public:
 	 *  @param baud The baud rate of the serial port (optional, defaults to MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE)
 	 */
 	FastSerial(PinName tx, PinName rx, int baud =
-	MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE) :
-			SerialBase(tx, rx, baud), _blocking(true), rx_head(rx_start), rx_tail(
+	MBED_CONF_PLATFORM_DEFAULT_SERIAL_BAUD_RATE, bool blocking=true) :
+			SerialBase(tx, rx, baud), _blocking(blocking), rx_head(rx_start), rx_tail(
 					rx_start), rx_end(
 					rx_start + MBED_CONF_DRIVERS_UART_SERIAL_RXBUF_SIZE), tx_head(
 					tx_start), tx_tail(tx_start), tx_end(

@@ -447,6 +447,8 @@ private:
 	static void addMiscMenu(PushToGo_MenuItem*);
 	static void addDebugMenu(PushToGo_MenuItem*);
 	static void addQuickMenu(PushToGo_MenuItem*);
+
+	friend struct usbItem;
 };
 
 struct tm getLocalTime(time_t timestamp = 0);

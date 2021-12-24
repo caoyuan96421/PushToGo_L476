@@ -41,7 +41,7 @@
 #define MBED_CONF_EVENTS_USE_LOWPOWER_TIMER_TICKER                        0                                                // set by library:events
 #define MBED_CONF_FAT_CHAN_FFS_DBG                                        0                                                // set by library:fat_chan
 #define MBED_CONF_FAT_CHAN_FF_CODE_PAGE                                   437                                              // set by library:fat_chan
-#define MBED_CONF_FAT_CHAN_FF_FS_EXFAT                                    0                                                // set by library:fat_chan
+#define MBED_CONF_FAT_CHAN_FF_FS_EXFAT                                    1                                                // set by application[NUCLEO_L476RG]
 #define MBED_CONF_FAT_CHAN_FF_FS_HEAPBUF                                  1                                                // set by library:fat_chan
 #define MBED_CONF_FAT_CHAN_FF_FS_LOCK                                     0                                                // set by library:fat_chan
 #define MBED_CONF_FAT_CHAN_FF_FS_MINIMIZE                                 0                                                // set by library:fat_chan
@@ -132,6 +132,17 @@
 #define MBED_CONF_RTOS_THREAD_USER_STACK_SIZE                             0                                                // set by library:rtos
 #define MBED_CONF_RTOS_TIMER_NUM                                          0                                                // set by library:rtos
 #define MBED_CONF_RTOS_TIMER_THREAD_STACK_SIZE                            768                                              // set by library:rtos
+#define MBED_CONF_SD_CMD0_IDLE_STATE_RETRIES                              5                                                // set by library:sd
+#define MBED_CONF_SD_CMD_TIMEOUT                                          10000                                            // set by library:sd
+#define MBED_CONF_SD_CRC_ENABLED                                          0                                                // set by library:sd
+#define MBED_CONF_SD_FSFAT_SDCARD_INSTALLED                               1                                                // set by library:sd
+#define MBED_CONF_SD_INIT_FREQUENCY                                       100000                                           // set by library:sd
+#define MBED_CONF_SD_SPI_CLK                                              SPI_SCK                                          // set by library:sd
+#define MBED_CONF_SD_SPI_CS                                               SPI_CS                                           // set by library:sd
+#define MBED_CONF_SD_SPI_MISO                                             SPI_MISO                                         // set by library:sd
+#define MBED_CONF_SD_SPI_MOSI                                             SPI_MOSI                                         // set by library:sd
+#define MBED_CONF_SD_TEST_BUFFER                                          8192                                             // set by library:sd
+#define MBED_CONF_SD_TRX_FREQUENCY                                        1000000                                          // set by library:sd
 #define MBED_CONF_STORAGE_DEFAULT_KV                                      kv                                               // set by library:storage
 #define MBED_CONF_STORAGE_FILESYSTEM_BLOCKDEVICE                          default                                          // set by library:storage_filesystem
 #define MBED_CONF_STORAGE_FILESYSTEM_EXTERNAL_BASE_ADDRESS                0                                                // set by library:storage_filesystem
@@ -187,7 +198,6 @@
 #define MEM_ALLOC                                                         malloc                                           // set by library:mbed-trace
 #define MEM_FREE                                                          free                                             // set by library:mbed-trace
 // Macros
-#define DEVICE_SPI_COUNT                                                  3                                                // defined by application
 #define MBEDTLS_CIPHER_MODE_CTR                                                                                            // defined by library:SecureStore
 #define MBEDTLS_CMAC_C                                                                                                     // defined by library:SecureStore
 #define MBED_CPU_STATS_ENABLED                                                                                             // defined by application

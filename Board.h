@@ -12,12 +12,13 @@
 
 // Usage of board features
 #define BOARD_USE_LCD		1
-#define BOARD_USE_USB		0
 #define BOARD_USE_SERIAL	1
+#define BOARD_USE_SD		1
 #define BOARD_USE_MOTOR		1
 #define BOARD_USE_ENCODER	1
 #define BOARD_USE_LED		1
 #define BOARD_USE_BUTTON	1
+#define BOARD_USE_ACCEL		1
 
 
 #define BOARD_VERSION 1.5
@@ -107,6 +108,21 @@ static const PinName Button_All[] = {BUTTON1, BUTTON2, BUTTON3};
 #define ENCODER_SCK			PB_10
 #define ENCODER1_CS			PC_1
 #define ENCODER2_CS			PC_4
+#endif
+
+// SD definition
+
+#if defined(BOARD_USE_SD) && BOARD_USE_SD
+#define SD_CS				PA_1
+#define SD_SCK				PB_3_ALT0
+#define SD_MISO				PB_4_ALT0
+#define SD_MOSI				PB_5_ALT0
+#endif
+
+// Accelerometer definition
+#if defined(BOARD_USE_ACCEL) && BOARD_USE_ACCEL
+#define ACCEL_SDA			PB_14
+#define ACCEL_SCL			PB_13
 #endif
 
 #endif /* BOARD_H_ */

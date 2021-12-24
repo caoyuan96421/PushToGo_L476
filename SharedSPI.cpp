@@ -11,7 +11,7 @@
 using namespace mbed;
 
 SharedSPI::SharedSPI(PinName mosi, PinName miso, PinName sclk, int bit, int mode, int freq, bool pol, PinMode pinMode) :
-		spi(mosi, miso, sclk, NC), polarity(pol), num_ifcs(0) {
+		spi(mosi, miso, sclk, NC), polarity(pol), num_ifcs(0), _mosi(mosi), _miso(miso), _sclk(sclk) {
 	spi.format(bit, mode);
 	spi.frequency(freq);
 	pin_mode(miso, pinMode);
@@ -44,9 +44,8 @@ int SharedSPI::SPI_Interface::write(const char *tx_buffer, int tx_length,
 }
 
 SharedSPI::SPI_Interface::SPI_Interface(SharedSPI *p, PinName c) :
-		SPI(NC, NC, NC), parent(p), cs(c) {
-	// The parent SPI will be still be initiated to SPIName of NC, but will not be used
-	// The "NC" SPI object will be shared among interfaces
+		SPI(p->_mosi, p->_miso, p->_sclk), parent(p), cs(c) {
+	// The parent SPI will be still be initiated to same PINs, and it will map to the same SPI object as the parent
 	parent->deassertCS(cs);
 }
 

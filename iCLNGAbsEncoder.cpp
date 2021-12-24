@@ -5,10 +5,11 @@
  *      Author: caoyu
  */
 
-#include <iCLNGAbsEncoder.h>
+#include "iCLNGAbsEncoder.h"
+#include "Logger.h"
 
 iCLNGAbsEncoder::iCLNGAbsEncoder(SPI *spi) :
-		spi(spi) {
+		spi(spi), initialized(false) {
 	activate(true);
 
 	write_reg(OUT1, 0x03);	// Set gain to x2
@@ -16,15 +17,33 @@ iCLNGAbsEncoder::iCLNGAbsEncoder(SPI *spi) :
 	write_reg(GS, 0x3F);	// Set gain to x2
 	write_reg(LCSET, 0x3F); // Set LED to max output
 	write_reg(OUT2, 0x10);  // Set output 16bit
+
+	// Try to read sensor
+	int count;
+	for(count=10 ;count && !data_available();count--);
+	if (count == 0){
+		// Cannot get data
+		initialized = false;
+		Logger::logError("iC-LNG cannot initialize.");
+	}
+	else{
+		initialized = true;
+		Logger::log("iC-LNG initialized succesfully.");
+	}
 }
 
 iCLNGAbsEncoder::~iCLNGAbsEncoder() {
 }
 
 uint32_t iCLNGAbsEncoder::readPosGray() {
-	while (!data_available())
-		;
-	return (uint32_t) get_sensor_data();
+	if (initialized) {
+		while (!data_available())
+			;
+		return (uint32_t) get_sensor_data();
+	}
+	else{
+		return 0;
+	}
 }
 int iCLNGAbsEncoder::spi_xchg(unsigned int size, OpCode opcode, char *txbuf,
 		char *rxbuf) {

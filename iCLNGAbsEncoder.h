@@ -49,6 +49,7 @@ private:
 	};
 
 	SPI *spi;
+	bool initialized;
 
 	int spi_xchg(unsigned int size, OpCode opcode, char *txbuf, char *rxbuf);
 	void activate(bool rapa);
