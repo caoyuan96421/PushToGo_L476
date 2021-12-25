@@ -516,10 +516,11 @@ void PushToGo_GUI::addDebugMenu(PushToGo_MenuItem *dbg) {
 				gui->lcd->print("  DISCONNECTED  ");
 				return;
 			}
-			double theta = atan2(x, sqrt(y * y + z * z));
-			double phi = atan2(y, z);
-			double t = asin(cos(theta) * sin(phi));
 			double g = sqrt(x * x + y * y + z * z);
+			double theta = asin(-z/g);
+//			double phi = atan2(y, z);
+//			double t = asin(cos(theta) * sin(phi));
+			double t = atan2(y, -x);
 			switch (axis) {
 			case 'X':
 				gui->lcd->print("%16.5f", x);

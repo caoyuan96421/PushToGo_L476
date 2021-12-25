@@ -138,7 +138,6 @@ public:
 	}
 };
 
-
 class DummyStepper: public StepperMotor {
 public:
 	DummyStepper() {
@@ -248,20 +247,30 @@ EquatorialMount& telescopeHardwareInit() {
 //	enc_spi1->frequency(4000000);
 //	enc_spi2->format(8, 3);
 //	enc_spi2->frequency(4000000);
+	// Initialize both RA and DEC encoders up front regardless if they're used, to prevent CS interlocking
+	auto spi1_ifc1 = spi1.getInterface(MOTOR1_CS);
+	auto spi1_ifc2 = spi1.getInterface(MOTOR2_CS);
+	auto spi2_ifc1 = spi2.getInterface(ENCODER1_CS);
+	auto spi2_ifc2 = spi2.getInterface(ENCODER2_CS);
 
-	ra_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER1_CS));
-	dec_encoder = new iCLNGAbsEncoder(spi2.getInterface(ENCODER2_CS));
+	if (TelescopeConfiguration::getBool("ra_use_encoder")) {
+		ra_encoder = new iCLNGAbsEncoder(spi2_ifc1);
+		ra_encoder->setDirection(
+				TelescopeConfiguration::getBool("ra_enc_invert"));
+	}
 
-	ra_encoder->setDirection(TelescopeConfiguration::getBool("ra_enc_invert"));
-	dec_encoder->setDirection(
-			TelescopeConfiguration::getBool("dec_enc_invert"));
+	if (TelescopeConfiguration::getBool("dec_use_encoder")) {
+		dec_encoder = new iCLNGAbsEncoder(spi2_ifc2);
+		dec_encoder->setDirection(
+				TelescopeConfiguration::getBool("dec_enc_invert"));
+	}
 
-	ra_stepper = new TMC2130(*spi1.getInterface(MOTOR1_CS), MOTOR1_STEP,
+	ra_stepper = new TMC2130(*spi1_ifc1, MOTOR1_STEP,
 	MOTOR1_DIR, MOTOR1_DIAG,
 	MOTOR1_IREF, TelescopeConfiguration::getBool("ra_invert"));
 //	ra_stepper = new DummyStepper();
 
-	dec_stepper = new TMC2130(*spi1.getInterface(MOTOR2_CS), MOTOR2_STEP,
+	dec_stepper = new TMC2130(*spi1_ifc2, MOTOR2_STEP,
 	MOTOR2_DIR, MOTOR2_DIAG,
 	MOTOR2_IREF, TelescopeConfiguration::getBool("dec_invert"));
 
@@ -306,7 +315,7 @@ osStatus telescopeServerInit() {
 	}
 	server_hc->bind(*eq_mount);
 
-    Logger::log("Serial server started.");
+	Logger::log("Serial server started.");
 
 	usbServerInit(eq_mount);
 

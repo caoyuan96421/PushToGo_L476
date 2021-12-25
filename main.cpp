@@ -261,7 +261,7 @@ int main() {
 
 		ThisThread::sleep_for(2ms);
 
-		eqMount->getRA().getAngleDeg();
+//		eqMount->getRA().getAngleDeg();
 
 //		xprintf("test");
 //		double x, y, z;
