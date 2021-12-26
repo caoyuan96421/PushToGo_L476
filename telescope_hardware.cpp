@@ -122,18 +122,21 @@ public:
 		((TMC2130*) stepper)->setStealthChop(true);
 		stepper->setCurrent(0.3);
 		stepper->setMicroStep(256);
+		stepper->powerOn();
 		Logger::log("%s IDLE Current=%.1f, Microstep=%d", axisName, 0.3, 256);
 	}
 	virtual void slew_mode() {
 		((TMC2130*) stepper)->setStealthChop(false);
 		stepper->setCurrent(0.7);
 		stepper->setMicroStep(32);
+		stepper->powerOn();
 		Logger::log("%s SLEW Current=%.1f, Microstep=%d", axisName, 0.7, 32);
 	}
 	virtual void track_mode() {
 		((TMC2130*) stepper)->setStealthChop(true);
 		stepper->setCurrent(0.3);
 		stepper->setMicroStep(256);
+		stepper->powerOn();
 		Logger::log("%s TRACK Current=%.1f, Microstep=%d", axisName, 0.3, 256);
 	}
 };

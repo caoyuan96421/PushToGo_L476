@@ -226,6 +226,21 @@ void PushToGo_GUI::addUtilitiesMenu(PushToGo_MenuItem *utilities) {
 	} *format = new formatItem();
 
 	utilities->add(format);
+
+
+	struct stopStepperItem: public PushToGo_MenuItem_Action_WithConfirm {
+		stopStepperItem() {
+			itemTitle = "Disable Steppers";
+		}
+		bool action(PushToGo_GUI *gui) {
+			gui->eqMount->stopSync();
+			gui->eqMount->getRA().getStepper()->powerOff();
+			gui->eqMount->getDEC().getStepper()->powerOff();
+			return true;
+		}
+	} *stopstepper = new stopStepperItem();
+
+	utilities->add(stopstepper);
 }
 
 void PushToGo_GUI::addCalibrationMenu(PushToGo_MenuItem *calibration) {
@@ -651,6 +666,21 @@ void PushToGo_GUI::addQuickMenu(PushToGo_MenuItem *root) {
 	usbItem *usbMount = new usbItem();
 
 	root->getGUI()->quickMenu.add(usbMount);
+
+
+	struct stopStepperItem: public PushToGo_MenuItem_Action_WithConfirm {
+		stopStepperItem() {
+			itemTitle = "Disable Steppers";
+		}
+		bool action(PushToGo_GUI *gui) {
+			gui->eqMount->stopSync();
+			gui->eqMount->getRA().getStepper()->powerOff();
+			gui->eqMount->getDEC().getStepper()->powerOff();
+			return true;
+		}
+	} *stopstepper = new stopStepperItem();
+
+	root->getGUI()->quickMenu.add(stopstepper);
 }
 
 void PushToGo_GUI::constructMenuStructure(PushToGo_MenuItem *root) {
